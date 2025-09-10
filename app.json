@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "peaq Machine Economy",
+    "slug": "peaq-machine-economy-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0E0D0C"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.peaq.machineeconomy"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0E0D0C"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.peaq.machineeconomy"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "template": "./web/index.html",
+      "headers": {
+        "Content-Security-Policy": "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' chrome-extension:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+      }
+    },
+    "scheme": "peaq-machine-economy",
+    "platforms": ["ios", "android", "web"],
+    "privacy": "public",
+    "sdkVersion": "53.0.0",
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/nb_international_pro_regular-webfont.ttf",
+            "./assets/fonts/nb_international_pro_bold-webfont.ttf"
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "peaq-machine-economy-app"
+      }
+    }
+  }
+}

@@ -1,0 +1,107 @@
+import { Machine } from '../types'
+
+// Mock data for machines
+export const MOCK_MACHINES: Machine[] = [
+  {
+    id: 'robo-cafe-001',
+    name: 'RoboCafe',
+    type: 'RoboCafe',
+    image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=300&fit=crop',
+    address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+    revenue: 0.32,
+    totalRevenue: 1250.75,
+    isActive: true,
+    location: {
+      name: 'Main Exhibition',
+      lat: 52.5200,
+      lng: 13.4050,
+    },
+  },
+  {
+    id: 'humanoid-001',
+    name: 'Humanoid Dispenser',
+    type: 'Humanoid',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&h=300&fit=crop',
+    address: '0x8ba1f109551bD432803012645Hac136c4c8b8b8b',
+    revenue: 0.18,
+    totalRevenue: 890.25,
+    isActive: true,
+    location: {
+      name: 'Conference Hall A',
+      lat: 52.5200,
+      lng: 13.4050,
+    },
+  },
+]
+
+// Animation durations
+export const ANIMATION_DURATION = {
+  FAST: 200,
+  NORMAL: 300,
+  SLOW: 500,
+  VERY_SLOW: 800,
+}
+
+// Enhanced glassmorphism styles with peaq colors
+export const GLASSMORPHISM = {
+  background: 'rgba(82, 82, 215, 0.08)', // purple-600 with lower opacity for subtlety
+  border: 'rgba(82, 82, 215, 0.15)',
+  backdropFilter: 'blur(20px)',
+  shadow: {
+    shadowColor: '#5252D7', // purple-600 for colored shadow
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  // Enhanced variants for different use cases
+  card: {
+    background: 'rgba(82, 82, 215, 0.06)',
+    border: 'rgba(82, 82, 215, 0.12)',
+    shadow: {
+      shadowColor: '#5252D7',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 10,
+    },
+  },
+  button: {
+    background: 'rgba(82, 82, 215, 0.1)',
+    border: 'rgba(82, 82, 215, 0.2)',
+    shadow: {
+      shadowColor: '#5252D7',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+  },
+}
+
+// Peaq gradient colors
+export const GRADIENTS = {
+  primary: ['#5252D7', '#8484FE'], // purple-600 to text-color-400
+  secondary: ['#CC940A', '#FF5F52'], // alert-text to red-scale-FF5F52
+  success: ['#06B6D4', '#A5F3FC'], // cyan-500 to cyan-100
+  machine: ['#5252D7', '#6666FE', '#8484FE'], // Machine card gradient with peaq purples
+}
+
+// Machine actions
+export const MACHINE_ACTIONS = {
+  RoboCafe: {
+    emoji: '☕',
+    action: 'Get Coffee',
+    price: 0.1,
+    description: 'Freshly brewed coffee from our robotic barista',
+  },
+  Humanoid: {
+    emoji: '👕',
+    action: 'Get T-Shirt',
+    price: 0.25,
+    description: 'Custom printed t-shirt from our humanoid factory',
+  },
+}
