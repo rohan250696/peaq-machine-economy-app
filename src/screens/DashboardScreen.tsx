@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView, RefreshControl } from 'react-native'
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView, RefreshControl, Alert } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MotiView } from 'moti'
 import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
-import { usePrivy, useWallets } from '@privy-io/react-auth'
-import { usePrivyAuth } from '../contexts/PrivyContext'
+import { usePrivy, useWallets, useLogout } from '../hooks/usePlatformAuth'
+import { useAccount, useBalance } from '../hooks/usePlatformWagmi'
 import { RootStackParamList, Ownership } from '../types'
 import { MOCK_MACHINES, GLASSMORPHISM, GRADIENTS } from '../constants'
 import { scaleWidth, scaleHeight, spacing, fontSizes, safeAreaPadding, isSmallScreen } from '../utils/responsive'
 import UserBalance from '../components/UserBalance'
+import PeaqNetworkStatus from '../components/PeaqNetworkStatus'
+import { safeTruncateAddress } from '../utils/safeSlice'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { width } = Dimensions.get('window')
 
@@ -35,33 +38,107 @@ const MOCK_OWNERSHIPS: Ownership[] = [
   },
 ]
 
-// Mock earnings data for chart
-const MOCK_EARNINGS_DATA = [
-  { time: '00:00', earnings: 0.1 },
-  { time: '04:00', earnings: 0.15 },
-  { time: '08:00', earnings: 0.22 },
-  { time: '12:00', earnings: 0.28 },
-  { time: '16:00', earnings: 0.35 },
-  { time: '20:00', earnings: 0.42 },
-  { time: '24:00', earnings: 0.50 },
-]
-
 export default function DashboardScreen() {
   const navigation = useNavigation<DashboardScreenNavigationProp>()
-  const { user, authenticated, logout } = usePrivy()
+  const { authenticated: isAuthenticated, user: privyUser } = usePrivy()
   const { wallets } = useWallets()
-  const { currentChain, switchToPeaqChain } = usePrivyAuth()
+  const { logout } = useLogout()
+  const { address, isConnected } = useAccount()
+  const { data: balance } = useBalance({ address })
+  const { colors } = useTheme()
   const [refreshing, setRefreshing] = useState(false)
-  const [totalBalance, setTotalBalance] = useState(0.50)
+  const [totalBalance, setTotalBalance] = useState(0) // Start with 0, will be fetched from wallet
   const [animatedBalance, setAnimatedBalance] = useState(0)
-  const [ownerships, setOwnerships] = useState<Ownership[]>(MOCK_OWNERSHIPS)
+  const [ownerships, setOwnerships] = useState<Ownership[]>([]) // Start empty, will be fetched
+  const [isLoadingBalance, setIsLoadingBalance] = useState(true)
+
+  // Get wallet address with proper validation
+  const walletAddress = address || (wallets && wallets.length > 0 && wallets[0]?.address 
+    ? String(wallets[0].address) 
+    : null)
+
+  // Convert Privy user to our User type with proper initialization
+  const user = privyUser ? {
+    id: privyUser.id || 'unknown',
+    walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+    email: privyUser.email?.address || privyUser.email || 'user@example.com',
+    name: privyUser.google?.name || privyUser.twitter?.name || 'User',
+    avatar: privyUser.twitter?.profilePictureUrl || undefined,
+    isAuthenticated: isAuthenticated,
+  } : {
+    id: 'guest',
+    walletAddress: '0x0000000000000000000000000000000000000000',
+    email: 'guest@example.com',
+    name: 'Guest User',
+    avatar: undefined,
+    isAuthenticated: false,
+  }
+
+  // Chain information
+  const currentChain = {
+    id: 3338,
+    name: 'peaq',
+    nativeCurrency: { symbol: 'PEAQ' }
+  }
+
+  const switchToPeaqChain = async () => {
+    try {
+      const wallet = wallets[0]
+      if (wallet && wallet.switchChain) {
+        await wallet.switchChain(3338)
+      }
+    } catch (error) {
+      console.error('Failed to switch to Peaq chain:', error)
+      throw error
+    }
+  }
+
+  // Fetch real wallet balance
+  const fetchWalletBalance = async () => {
+    setIsLoadingBalance(true)
+    try {
+      if (balance) {
+        console.log('Wallet balance:', balance)
+        // Convert balance to number for display (assuming 18 decimals for PEAQ)
+        const balanceNumber = parseFloat(balance.value.toString()) / Math.pow(10, 18)
+        setTotalBalance(balanceNumber)
+      } else {
+        // Fallback to mock data if balance fetch fails
+        setTotalBalance(0.50)
+        const demoOwnerships = MOCK_OWNERSHIPS.map(ownership => ({
+          ...ownership,
+          // Add demo indicator
+          machineId: ownership.machineId,
+          percentage: ownership.percentage,
+          tokens: ownership.tokens,
+          totalTokens: ownership.totalTokens,
+          earnings: ownership.earnings,
+          lastEarning: ownership.lastEarning,
+        }))
+        setOwnerships(demoOwnerships)
+      }
+    } catch (error) {
+      console.error('Failed to fetch wallet balance:', error)
+    } finally {
+      setIsLoadingBalance(false)
+    }
+  }
 
   // Redirect to onboarding if not authenticated
   useEffect(() => {
-    if (!authenticated) {
+    if (!isAuthenticated) {
       navigation.replace('Onboarding')
     }
-  }, [authenticated, navigation])
+  }, [isAuthenticated, navigation])
+
+  // Fetch wallet balance when wallets are available
+  useEffect(() => {
+    if (wallets && wallets.length > 0 && isAuthenticated) {
+      console.log('DashboardScreen - Wallets available:', wallets)
+      console.log('DashboardScreen - User data:', privyUser)
+      fetchWalletBalance()
+    }
+  }, [wallets, isAuthenticated, balance])
 
   useEffect(() => {
     // Animate balance counter
@@ -86,17 +163,29 @@ export default function DashboardScreen() {
   const handleRefresh = async () => {
     setRefreshing(true)
     
-    // Simulate refresh delay and update earnings
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    setOwnerships(prev => prev.map(ownership => ({
-      ...ownership,
-      earnings: ownership.earnings + (Math.random() * 0.1),
-      lastEarning: new Date().toISOString()
-    })))
-    
-    setTotalBalance(prev => prev + (Math.random() * 0.2))
-    setRefreshing(false)
+    try {
+      // Fetch real wallet balance
+      await fetchWalletBalance()
+      
+      // For now, keep mock ownership data since we don't have real machine ownership data
+      // In a real app, you would fetch this from your backend/blockchain
+      const demoOwnerships = MOCK_OWNERSHIPS.map(ownership => ({
+        ...ownership,
+        // Add demo indicator
+        machineId: ownership.machineId,
+        percentage: ownership.percentage,
+        tokens: ownership.tokens,
+        totalTokens: ownership.totalTokens,
+        earnings: ownership.earnings,
+        lastEarning: ownership.lastEarning,
+      }))
+      setOwnerships(demoOwnerships)
+      
+    } catch (error) {
+      console.error('Failed to refresh data:', error)
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const handleLogout = async () => {
@@ -120,31 +209,48 @@ export default function DashboardScreen() {
     return ownerships.reduce((sum, ownership) => sum + ownership.percentage, 0)
   }
 
+  // Create dynamic styles based on theme
+  const dynamicStyles = React.useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.background,
+    },
+    title: {
+      color: colors.text,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+    },
+    userName: {
+      color: colors.text,
+    },
+    balanceText: {
+      color: colors.textSecondary,
+    },
+    sectionTitle: {
+      color: colors.text,
+    },
+    cardTitle: {
+      color: colors.text,
+    },
+    cardSubtitle: {
+      color: colors.textSecondary,
+    },
+    earningsText: {
+      color: colors.text,
+    },
+    percentageText: {
+      color: colors.primary,
+    },
+  }), [colors])
+
   return (
-    <LinearGradient
-      colors={['#0E0D0C', '#1A1A1A', '#0E0D0C']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor="#5252D7"
-            colors={['#5252D7']}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-        alwaysBounceVertical={false}
-        scrollEventThrottle={16}
-        nestedScrollEnabled={true}
-        keyboardShouldPersistTaps="handled"
-      >
+    <div style={{
+      height: '100vh',
+      backgroundColor: colors.background,
+      color: colors.text,
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }}>
         {/* Header */}
         <MotiView
           from={{ opacity: 0, translateY: -30 }}
@@ -157,20 +263,28 @@ export default function DashboardScreen() {
         >
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.title}>Dashboard</Text>
-              <Text style={styles.subtitle}>Your Machine Economy Portfolio</Text>
-              {user && (
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>
-                    Welcome, {user.email?.address || 'User'}!
-                  </Text>
-                  {wallets[0] && (
-                    <Text style={styles.walletAddress}>
-                      {wallets[0].address.slice(0, 6)}...{wallets[0].address.slice(-4)}
-                    </Text>
-                  )}
-                </View>
-              )}
+              <Text style={dynamicStyles.title}>Dashboard</Text>
+              <Text style={dynamicStyles.subtitle}>Your Machine Economy Portfolio</Text>
+                      {user && (
+                        <View style={styles.userInfo}>
+                          <Text style={dynamicStyles.userName}>
+                            Welcome, {user.email?.toString() || user.name || 'User'}!
+                          </Text>
+                          {user.walletAddress && typeof user.walletAddress === 'string' && user.walletAddress.length > 0 && (
+                            <Text style={styles.walletAddress}>
+                              {(() => {
+                                // Debug logging
+                                console.log('DashboardScreen - walletAddress:', user.walletAddress, 'type:', typeof user.walletAddress, 'length:', user.walletAddress?.length);
+                                
+                                return safeTruncateAddress(user.walletAddress);
+                              })()}
+                            </Text>
+                          )}
+                          <Text style={dynamicStyles.balanceText}>
+                            Balance: {isLoadingBalance ? 'Loading...' : `${totalBalance.toFixed(4)} PEAQ`}
+                          </Text>
+                        </View>
+                      )}
             </View>
             <TouchableOpacity
               style={styles.logoutButton}
@@ -182,12 +296,44 @@ export default function DashboardScreen() {
           </View>
         </MotiView>
 
-        {/* User Balance */}
-        <UserBalance 
-          balance={totalBalance} 
-          onRefresh={handleRefresh}
-          showRefresh={true}
-        />
+        {/* Peaq Network Status */}
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{
+            type: 'timing',
+            duration: 600,
+            delay: 200,
+          }}
+        >
+          <PeaqNetworkStatus 
+            onNetworkSwitch={fetchWalletBalance}
+            showSwitchButton={true}
+          />
+        </MotiView>
+
+        {/* Demo Data Indicator */}
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{
+            type: 'timing',
+            duration: 600,
+            delay: 300,
+          }}
+          style={styles.demoIndicator}
+        >
+          <Text style={styles.demoText}>
+            🚧 Demo Data - Machine ownership data is simulated for testing
+          </Text>
+        </MotiView>
+
+                {/* User Balance */}
+                <UserBalance 
+                  balance={isLoadingBalance ? 0 : totalBalance} 
+                  onRefresh={handleRefresh}
+                  showRefresh={true}
+                />
 
         {/* Stats Grid */}
         <MotiView
@@ -333,6 +479,7 @@ export default function DashboardScreen() {
           })}
         </MotiView>
 
+
         {/* Action Buttons */}
         <MotiView
           from={{ opacity: 0, translateY: 30 }}
@@ -340,7 +487,7 @@ export default function DashboardScreen() {
           transition={{
             type: 'timing',
             duration: 800,
-            delay: 1000,
+            delay: 1200,
           }}
           style={styles.actionButtons}
         >
@@ -359,9 +506,7 @@ export default function DashboardScreen() {
             </LinearGradient>
           </TouchableOpacity>
         </MotiView>
-      </ScrollView>
-      
-    </LinearGradient>
+    </div>
   )
 }
 
@@ -399,6 +544,13 @@ const styles = StyleSheet.create({
     color: '#A7A6A5',
     fontFamily: 'NB International Pro',
   },
+  balanceText: {
+    fontSize: 14,
+    color: '#5252D7',
+    marginTop: 4,
+    fontWeight: 'bold',
+    fontFamily: 'NB International Pro Bold',
+  },
   logoutButton: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     paddingHorizontal: 12,
@@ -432,13 +584,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 8,
     fontFamily: 'NB International Pro Bold',
   },
   subtitle: {
     fontSize: 16,
-    color: '#A7A6A5',
     fontFamily: 'NB International Pro',
   },
   balanceCard: {
@@ -544,6 +694,20 @@ const styles = StyleSheet.create({
   chainSection: {
     marginBottom: 24,
   },
+  demoIndicator: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+    borderRadius: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  demoText: {
+    fontSize: 12,
+    color: '#FFC107',
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
+  },
   chainCard: {
     backgroundColor: GLASSMORPHISM.background,
     borderRadius: 16,
@@ -643,6 +807,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontFamily: 'NB International Pro',
+  },
+  demoNetworkStatus: {
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: 'rgba(0, 174, 239, 0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 174, 239, 0.3)',
+    alignItems: 'center',
+  },
+  demoNetworkText: {
+    color: '#00AEEF',
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   actionButtons: {
     gap: 16,

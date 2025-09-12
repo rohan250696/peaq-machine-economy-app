@@ -4,12 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { MotiView } from 'moti'
 import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
-import { usePrivy } from '@privy-io/react-auth'
+import { usePrivy, useLogin } from '../hooks/usePlatformAuth'
 import { RootStackParamList } from '../types'
 import { GLASSMORPHISM } from '../constants'
 import { scaleWidth, scaleHeight, spacing, fontSizes, safeAreaPadding, isSmallScreen, layout, responsive } from '../utils/responsive'
 import { createAccessibleButton, createAccessibleCard } from '../utils/accessibility'
 import SocialLoginButton from '../components/SocialLoginButton'
+import PeaqNetworkStatus from '../components/PeaqNetworkStatus'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { width, height } = Dimensions.get('window')
 
@@ -17,7 +19,9 @@ type OnboardingScreenNavigationProp = StackNavigationProp<RootStackParamList, 'O
 
 export default function OnboardingScreen() {
   const navigation = useNavigation<OnboardingScreenNavigationProp>()
-  const { login, authenticated, ready } = usePrivy()
+  const { authenticated, ready } = usePrivy()
+  const { login } = useLogin()
+  const { colors } = useTheme()
   const [isLoading, setIsLoading] = useState(false)
 
   // Redirect if already authenticated
@@ -32,7 +36,7 @@ export default function OnboardingScreen() {
     try {
       console.log(`Logging in with ${provider}`)
       
-      // Use Privy login
+      // Use Privy login with specific method
       await login()
       
       // Navigation will be handled by the useEffect above
@@ -45,13 +49,27 @@ export default function OnboardingScreen() {
   }
 
 
+  // Create dynamic styles based on theme
+  const dynamicStyles = React.useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.background,
+    },
+    title: {
+      color: colors.text,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+    },
+  }), [colors])
+
   return (
-    <LinearGradient
-      colors={['#0E0D0C', '#1A1A1A', '#0E0D0C']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
+    <div style={{
+      height: '100vh',
+      backgroundColor: colors.background,
+      color: colors.text,
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }}>
       {/* Background Elements */}
       <MotiView
         from={{ opacity: 0, scale: 0.8 }}
@@ -64,18 +82,6 @@ export default function OnboardingScreen() {
         style={styles.backgroundElement}
       />
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        bounces={true}
-        alwaysBounceVertical={false}
-        scrollEventThrottle={16}
-        nestedScrollEnabled={true}
-        accessibilityRole="scrollbar"
-        accessibilityLabel="Onboarding content"
-      >
         {/* Header */}
         <MotiView
           from={{ opacity: 0, translateY: -50 }}
@@ -86,8 +92,8 @@ export default function OnboardingScreen() {
           }}
           style={styles.header}
         >
-          <Text style={styles.title}>Welcome to peaq</Text>
-          <Text style={styles.subtitle}>
+          <Text style={dynamicStyles.title}>Welcome to peaq</Text>
+          <Text style={dynamicStyles.subtitle}>
             Connect your wallet to start earning from{'\n'}autonomous machines
           </Text>
         </MotiView>
@@ -122,8 +128,26 @@ export default function OnboardingScreen() {
               disabled={isLoading}
             />
           </View>
+          
         </MotiView>
 
+        {/* Show network status after login */}
+        {authenticated && (
+          <MotiView
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{
+              type: 'timing',
+              duration: 600,
+              delay: 500,
+            }}
+            style={styles.networkStatusContainer}
+          >
+            <PeaqNetworkStatus 
+              showSwitchButton={true}
+            />
+          </MotiView>
+        )}
 
         {/* Footer */}
         <MotiView
@@ -141,8 +165,7 @@ export default function OnboardingScreen() {
           </Text>
           
         </MotiView>
-      </ScrollView>
-    </LinearGradient>
+    </div>
   )
 }
 
@@ -174,7 +197,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: responsive(fontSizes.largeTitle, fontSizes.huge),
     fontWeight: 'bold',
-    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: spacing.md,
     fontFamily: 'NB International Pro Bold',
@@ -182,7 +204,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: responsive(fontSizes.lg, fontSizes.xl),
-    color: '#A7A6A5',
     textAlign: 'center',
     lineHeight: responsive(fontSizes.lg * 1.5, fontSizes.xl * 1.5),
     fontFamily: 'NB International Pro',
@@ -229,6 +250,9 @@ const styles = StyleSheet.create({
   },
   socialOptions: {
     gap: spacing.md,
+  },
+  networkStatusContainer: {
+    marginTop: spacing.lg,
   },
   walletOptions: {
     alignItems: 'center',

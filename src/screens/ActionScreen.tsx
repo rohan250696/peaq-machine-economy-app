@@ -7,6 +7,7 @@ import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList, Machine } from '../types'
 import { MACHINE_ACTIONS, GLASSMORPHISM, GRADIENTS } from '../constants'
 import { scaleWidth, scaleHeight, spacing, fontSizes, safeAreaPadding, layout, responsive } from '../utils/responsive'
+import { safeTruncateAddress } from '../utils/safeSlice'
 
 const { width, height } = Dimensions.get('window')
 
@@ -39,26 +40,16 @@ export default function ActionScreen() {
   }
 
   const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
+    return safeTruncateAddress(address);
   }
 
   return (
-    <LinearGradient
-      colors={['#0E0D0C', '#1A1A1A', '#0E0D0C']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-        alwaysBounceVertical={false}
-        scrollEventThrottle={16}
-        nestedScrollEnabled={true}
-        keyboardShouldPersistTaps="handled"
-      >
+    <div style={{
+      height: '100vh',
+      backgroundColor: '#0E0D0C',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }}>
         {/* Header */}
         <MotiView
           from={{ opacity: 0, translateY: -30 }}
@@ -67,7 +58,7 @@ export default function ActionScreen() {
             type: 'timing',
             duration: 800,
           }}
-          style={styles.header}
+          style={[styles.header, { paddingTop: responsive(90, 100, 110) }]}
         >
           <TouchableOpacity
             style={styles.backButton}
@@ -246,8 +237,7 @@ export default function ActionScreen() {
             </View>
           </View>
         </MotiView>
-      </ScrollView>
-    </LinearGradient>
+    </div>
   )
 }
 

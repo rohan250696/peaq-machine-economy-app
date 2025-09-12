@@ -1,137 +1,318 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView, Image, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, ScrollView } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MotiView } from 'moti'
 import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList, Machine } from '../types'
-import { MOCK_MACHINES, GLASSMORPHISM, GRADIENTS } from '../constants'
-import { scaleWidth, scaleHeight, spacing, fontSizes, safeAreaPadding, getCardWidth, isSmallScreen, layout, responsive } from '../utils/responsive'
+import { MOCK_MACHINES } from '../constants'
 import * as Clipboard from 'expo-clipboard'
+import { useChainId, useBalance, useSwitchChain } from '../hooks/usePlatformWagmi'
+import { useAccount } from 'wagmi'
+import { usePrivy, useWallets } from '../hooks/usePlatformAuth'
+import { safeTruncateAddress } from '../utils/safeSlice'
+import MachineCard from '../components/MachineCard'
+import { useCopyFeedback } from '../components/GlobalUserInfo'
+import { useTheme } from '../contexts/ThemeContext'
+import { 
+  useMachineManager, 
+  useTokenBalance, 
+  useMachineInfo,
+  useClaimableFor,
+  useOwnershipBps,
+  useAllMachines
+} from '../contexts/MachineManagerContext'
+import { 
+  spacing, 
+  fontSizes, 
+  responsive, 
+  getGridColumns,
+  safeAreaPadding,
+  glassmorphism,
+  shadows
+} from '../components/ResponsiveLayout'
 
 const { width } = Dimensions.get('window')
-const cardWidth = getCardWidth(2, safeAreaPadding.horizontal * 2)
 
 type MachineSelectionScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MachineSelection'>
 
+// Component that wraps MachineCard with real contract data
+interface MachineCardWithRealDataProps {
+  machine: Machine
+  index: number
+  onPress: (machine: Machine) => void
+  onCopyAddress: (address: string) => void
+  columns: number
+  userAddress: string
+}
+
+function MachineCardWithRealData({ 
+  machine, 
+  index, 
+  onPress, 
+  onCopyAddress, 
+  columns, 
+  userAddress 
+}: MachineCardWithRealDataProps) {
+  // Real-time contract data hooks
+  const { machineInfo, isLoading: machineLoading } = useMachineInfo(machine.id)
+  const { claimableAmount, isLoading: claimableLoading } = useClaimableFor(machine.id, userAddress)
+  const { ownershipBps, isLoading: ownershipLoading } = useOwnershipBps(machine.id, userAddress)
+  
+  // Create enhanced machine object with real data
+  const enhancedMachine: Machine = React.useMemo(() => {
+    if (machineInfo) {
+      return {
+        ...machine,
+        name: machineInfo.name,
+        address: machineInfo.machineAddr,
+        revenue: parseFloat(claimableAmount),
+        totalRevenue: parseFloat(machineInfo.lifetimeRevenue),
+        isActive: true, // Assume active if we can fetch data
+        // Add real contract data
+        price: parseFloat(machineInfo.price),
+        platformFeeBps: machineInfo.platformFeeBps,
+        revenueShareBps: machineInfo.revenueShareBps,
+        sharesPerPurchase: parseFloat(machineInfo.sharesPerPurchase),
+        totalShares: parseFloat(machineInfo.totalShares),
+        unallocatedRevenue: parseFloat(machineInfo.unallocatedRevenue),
+        ownershipBps: parseFloat(ownershipBps),
+      }
+    }
+    return machine
+  }, [machine, machineInfo, claimableAmount, ownershipBps])
+  
+  return (
+    <View 
+      style={[
+        styles.machineItem,
+        { width: columns === 1 ? '100%' : `${(100 / columns) - 2}%` }
+      ]}
+    >
+      <MachineCard
+        machine={enhancedMachine}
+        index={index}
+        onPress={onPress}
+        onCopyAddress={onCopyAddress}
+        columns={columns}
+        isLoading={machineLoading || claimableLoading || ownershipLoading}
+      />
+    </View>
+  )
+}
+
 export default function MachineSelectionScreen() {
   const navigation = useNavigation<MachineSelectionScreenNavigationProp>()
-  const [machines, setMachines] = useState<Machine[]>(MOCK_MACHINES)
   const [refreshing, setRefreshing] = useState(false)
+  const [networkFetchStatus, setNetworkFetchStatus] = useState<string>('')
+  const { showCopyFeedback } = useCopyFeedback()
+  const { colors } = useTheme()
+  
+  // Get real machines from contract
+  const { machines: contractMachines, isLoading: machinesLoading, error: machinesError } = useAllMachines()
+  
+  // Machine Manager Context hooks
+  const { getMachine, getTokenBalance, getAllMachines } = useMachineManager()
+  
+  // Create dynamic styles based on theme - use useMemo to ensure they update when theme changes
+  const dynamicStyles = React.useMemo(() => StyleSheet.create({
+    container: {
+      ...styles.container,
+      backgroundColor: colors.background,
+    },
+    title: {
+      ...styles.title,
+      color: colors.text,
+    },
+    subtitle: {
+      ...styles.subtitle,
+      color: colors.textSecondary,
+    },
+    statCard: {
+      ...styles.statCard,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    statValue: {
+      ...styles.statValue,
+      color: colors.primary,
+    },
+    statLabel: {
+      ...styles.statLabel,
+      color: colors.textSecondary,
+    },
+  }), [colors])
+  
+  // Privy hooks
+  const { ready, authenticated } = usePrivy();
+  
+  // Wagmi hooks
+  const { address, isConnected } = useAccount()
+  const chainId = useChainId()
+  const { data: balance } = useBalance({ address })
+  const { switchChain } = useSwitchChain()
+  const { wallets } = useWallets()
+  
+  // Real-time token balance from MachineManagerContext
+  const { balance: peaqBalance, isLoading: balanceLoading } = useTokenBalance(address || '')
 
   useEffect(() => {
-    // Simulate live revenue updates
-    const interval = setInterval(() => {
-      setMachines(prev => prev.map(machine => ({
-        ...machine,
-        revenue: machine.revenue + (Math.random() * 0.1 - 0.05)
-      })))
-    }, 5000)
+    console.log('PrivyWallets wallets.map(w => w.chainId):', wallets.map(w => w.chainId))
+    console.log('Wagmi chainId:', chainId)
+  }, [wallets])
+  
+  // Check if connected to Peaq network (Chain ID: 3338)
+  const isConnectedToPeaq = chainId === 3338
+  const peaqChainId = 3338
+  
 
-    return () => clearInterval(interval)
-  }, [])
+  // Convert contract machines to our Machine interface using useMemo to prevent infinite loops
+  const convertedMachines = React.useMemo(() => {
+    if (!contractMachines || contractMachines.length === 0) {
+      return MOCK_MACHINES.map(machine => ({
+        ...machine,
+        address: address || ''
+      }))
+    }
+    
+    return contractMachines.map((contractMachine, index) => ({
+      id: `machine-${index + 1}`, // Generate ID since contract doesn't provide it
+      name: contractMachine.name,
+      type: (contractMachine.name.toLowerCase().includes('cafe') ? 'RoboCafe' : 'Humanoid') as 'RoboCafe' | 'Humanoid',
+      image: `https://picsum.photos/300/200?random=${index + 1}`, // Placeholder image
+      address: contractMachine.machineOnChainAddr,
+      revenue: parseFloat(contractMachine.lifetimeRevenue),
+      totalRevenue: parseFloat(contractMachine.lifetimeRevenue),
+      isActive: contractMachine.exists || false,
+      location: {
+        name: 'Tokyo, Japan',
+        lat: 35.6762,
+        lng: 139.6503
+      },
+      // Contract data fields
+      price: parseFloat(contractMachine.price),
+      platformFeeBps: contractMachine.platformFeeBps,
+      revenueShareBps: contractMachine.revenueShareBps,
+      sharesPerPurchase: parseFloat(contractMachine.sharesPerPurchase),
+      totalShares: parseFloat(contractMachine.totalShares),
+      unallocatedRevenue: parseFloat(contractMachine.unallocatedRevenue),
+    }))
+  }, [contractMachines, address])
+
+  // Calculate network statistics from converted machines
+  const networkStats = React.useMemo(() => {
+    if (convertedMachines === MOCK_MACHINES || convertedMachines.length === 0) {
+      return {
+        totalRevenue: '2,847.32',
+        activeCount: 24
+      }
+    }
+    
+    let totalRevenue = 0
+    let activeCount = 0
+    
+    for (const machine of convertedMachines) {
+      totalRevenue += machine.totalRevenue
+      if (machine.isActive) {
+        activeCount++
+      }
+    }
+    
+    return {
+      totalRevenue: totalRevenue.toFixed(2),
+      activeCount
+    }
+  }, [convertedMachines])
+
+  // Use computed values directly instead of state to prevent infinite loops
+  const machines = convertedMachines
+  const totalNetworkRevenue = networkStats.totalRevenue
+  const activeMachinesCount = networkStats.activeCount
+  const isLoading = machinesLoading
+
+  useEffect(() => {
+    if (!authenticated) {
+      // User not authenticated, redirect to onboarding
+      navigation.navigate('Onboarding')
+    }
+  }, [authenticated, navigation])
+
+  // Fetch machines from network when user connects
+  useEffect(() => {
+    if (address && isConnected) {
+      fetchMachinesFromNetwork()
+    }
+  }, [address, isConnected])
+
+  // Handle network switching to Peaq
+  const handleSwitchToPeaq = async () => {
+    try {
+      await switchChain({ chainId: peaqChainId })
+    } catch (error) {
+      console.error('Failed to switch to Peaq network:', error)
+      Alert.alert('Network Switch Failed', 'Please switch to Peaq network manually in your wallet.')
+    }
+  }
+
+  // Function to fetch machines using getAllMachines
+  const fetchMachinesFromNetwork = async () => {
+    try {
+      if (!address || !isConnected) return
+      
+      setNetworkFetchStatus('Fetching from network...')
+      console.log('Fetching machines from network using getAllMachines...')
+      const networkMachines = await getAllMachines()
+      console.log('Fetched machines from network:', networkMachines)
+      
+      setNetworkFetchStatus(`✅ Fetched ${networkMachines.length} machines from network`)
+      
+      // The useAllMachines hook will automatically update with the latest data
+      // This function provides manual control over when to fetch
+    } catch (error) {
+      console.error('Failed to fetch machines from network:', error)
+      setNetworkFetchStatus('❌ Failed to fetch from network')
+    }
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    // Simulate refresh delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setRefreshing(false)
+    try {
+      // Fetch fresh data from the network using getAllMachines
+      await fetchMachinesFromNetwork()
+    } catch (error) {
+      console.error('Failed to refresh machines:', error)
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const handleMachinePress = (machine: Machine) => {
-    navigation.navigate('Action', { machine })
+    navigation.navigate('PaymentFlow', { machine, action: 'interact' })
   }
 
   const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
+    return safeTruncateAddress(address);
   }
 
   const copyAddress = async (address: string) => {
     try {
       await Clipboard.setStringAsync(address)
-      Alert.alert('Copied!', 'Address copied to clipboard')
+      showCopyFeedback()
     } catch (error) {
+      console.error('Failed to copy address:', error)
       Alert.alert('Error', 'Failed to copy address')
     }
   }
 
-  const MachineCard = ({ machine, index }: { machine: Machine; index: number }) => (
-    <MotiView
-      from={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{
-        type: 'timing',
-        duration: 200,
-        delay: index * 100,
-      }}
-    >
-      <TouchableOpacity
-        style={styles.machineCard}
-        onPress={() => handleMachinePress(machine)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.cardGradient}>
-          <View style={styles.cardContent}>
-            {/* Machine Image */}
-            <View style={styles.imageContainer}>
-              <Image source={{ uri: machine.image }} style={styles.machineImage} />
-              <View style={styles.statusIndicator}>
-                <View style={[
-                  styles.statusDot,
-                  { backgroundColor: machine.isActive ? '#06B6D4' : '#EF4444' }
-                ]} />
-                <Text style={[
-                  styles.statusText,
-                  { color: machine.isActive ? '#06B6D4' : '#EF4444' }
-                ]}>
-                  {machine.isActive ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Machine Info */}
-            <View style={styles.machineInfo}>
-              <Text style={styles.machineName}>{machine.name}</Text>
-              <Text style={styles.machineType}>{machine.type}</Text>
-              
-              {/* Revenue */}
-              <View style={styles.revenueContainer}>
-                <Text style={styles.revenueLabel}>Live Revenue</Text>
-                <Text style={styles.revenueAmount}>
-                  {machine.revenue.toFixed(2)} PEAQ
-                </Text>
-              </View>
-
-              {/* Location */}
-              <Text style={styles.machineLocation}>
-                📍 {machine.location.name}
-              </Text>
-
-              {/* Address with Copy */}
-              <TouchableOpacity 
-                style={styles.addressContainer}
-                onPress={() => copyAddress(machine.address)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.machineAddress}>
-                  {truncateAddress(machine.address)}
-                </Text>
-                <Text style={styles.copyIcon}>📋</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </MotiView>
-  )
 
   return (
-    <LinearGradient
-      colors={['#0E0D0C', '#1A1A1A', '#0E0D0C']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
+    <div style={{
+      height: '100vh',
+      backgroundColor: colors.background,
+      color: colors.text,
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }}>
       {/* Header */}
       <MotiView
         from={{ opacity: 0, translateY: -30 }}
@@ -140,73 +321,139 @@ export default function MachineSelectionScreen() {
           type: 'timing',
           duration: 800,
         }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: responsive(90, 100, 110) }]}
       >
-        <Text style={styles.title}>Available Machines</Text>
-        <Text style={styles.subtitle}>
-          Select a machine to interact with and earn
-        </Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerText}>
+            <Text style={dynamicStyles.title}>Available Machines</Text>
+            <Text style={dynamicStyles.subtitle}>
+              Select a machine to interact with and earn
+            </Text>
+            
+            {/* Network Fetch Status */}
+            {networkFetchStatus && (
+              <View style={styles.networkStatusContainer}>
+                <Text style={styles.networkStatusText}>{networkFetchStatus}</Text>
+              </View>
+            )}
+          </View>
+        </View>
       </MotiView>
 
-      {/* Machine Grid */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-        alwaysBounceVertical={false}
-        scrollEventThrottle={16}
-        // Web-specific props
-        nestedScrollEnabled={true}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            <Text style={styles.refreshText}>
-              {refreshing ? 'Refreshing...' : '🔄 Pull to refresh'}
-            </Text>
-          </TouchableOpacity>
-        }
-      >
-        <View style={styles.machineGrid}>
-          {machines.map((machine, index) => (
-            <MachineCard key={machine.id} machine={machine} index={index} />
-          ))}
-        </View>
-
-        {/* Stats Section */}
+      {/* Stats Cards - Moved to Top */}
+      <View style={styles.statsContainer}>
         <MotiView
-          from={{ opacity: 0, translateY: 30 }}
+          from={{ opacity: 0, translateY: 20 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: 'timing',
             duration: 800,
-            delay: 500,
+            delay: 200,
           }}
-          style={styles.statsContainer}
+          style={styles.statsGrid}
         >
-          <View style={styles.statsCard}>
-            <Text style={styles.statsTitle}>Total Network Revenue</Text>
-            <Text style={styles.statsAmount}>
-              {machines.reduce((sum, machine) => sum + machine.totalRevenue, 0).toFixed(2)} PEAQ
-            </Text>
-          </View>
-          
-          <View style={styles.statsCard}>
-            <Text style={styles.statsTitle}>Active Machines</Text>
-            <Text style={styles.statsAmount}>
-              {machines.filter(m => m.isActive).length} / {machines.length}
-            </Text>
-          </View>
+          {/* Total Network Revenue */}
+          <LinearGradient
+            colors={['rgba(82, 82, 215, 0.1)', 'rgba(132, 132, 254, 0.1)']}
+            style={dynamicStyles.statCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.statContent}>
+              <Text style={dynamicStyles.statValue}>
+                {isLoading ? '...' : totalNetworkRevenue}
+              </Text>
+              <Text style={dynamicStyles.statLabel}>Total Network Revenue</Text>
+              <Text style={styles.statUnit}>peaq</Text>
+            </View>
+          </LinearGradient>
+
+          {/* Active Machines */}
+          <LinearGradient
+            colors={['rgba(82, 82, 215, 0.1)', 'rgba(132, 132, 254, 0.1)']}
+            style={dynamicStyles.statCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.statContent}>
+              <Text style={dynamicStyles.statValue}>
+                {isLoading ? '...' : activeMachinesCount}
+              </Text>
+              <Text style={dynamicStyles.statLabel}>Active Machines</Text>
+              <Text style={styles.statUnit}>Online</Text>
+            </View>
+          </LinearGradient>
         </MotiView>
-      </ScrollView>
-      
-    </LinearGradient>
+      </View>
+
+
+          {!ready ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Initializing...</Text>
+              <Text style={styles.loadingSubtext}>Setting up wallet connection</Text>
+            </View>
+          ) : !authenticated ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Please connect your wallet</Text>
+              <Text style={styles.emptySubtext}>You need to be authenticated to view machines</Text>
+            </View>
+          ) : !isConnected ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Wallet not connected</Text>
+              <Text style={styles.emptySubtext}>Please connect your wallet to continue</Text>
+            </View>
+          ) : isLoading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading machines...</Text>
+              <Text style={styles.loadingSubtext}>Fetching from Peaq network</Text>
+            </View>
+          ) : machines.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No machines available</Text>
+              <Text style={styles.emptySubtext}>Check back later for new machines</Text>
+            </View>
+          ) : (
+            <View style={styles.machinesGrid}>
+              {machines.map((machine, index) => (
+                <MachineCardWithRealData
+                  key={machine.id}
+                  machine={machine}
+                  index={index}
+                  onPress={handleMachinePress}
+                  onCopyAddress={copyAddress}
+                  columns={getGridColumns()}
+                  userAddress={address || ''}
+                />
+              ))}
+            </View>
+          )}
+
+
+    </div>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: '100%',
+    backgroundColor: '#0E0D0C',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: safeAreaPadding.bottom + spacing.xl,
+  },
+  machinesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: safeAreaPadding.horizontal,
+    gap: spacing.lg,
+  },
+  machineItem: {
+    marginBottom: spacing.lg,
   },
   header: {
     paddingTop: safeAreaPadding.top,
@@ -214,190 +461,125 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     alignItems: 'center',
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: responsive(spacing.sm, spacing.md, spacing.lg),
+  },
+  headerText: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: responsive(200, 250, 300),
+  },
+  networkStatusContainer: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.3)',
+  },
+  networkStatusText: {
+    fontSize: fontSizes.sm,
+    color: '#60A5FA',
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
+  },
   title: {
-    fontSize: responsive(fontSizes.title, fontSizes.largeTitle),
+    fontSize: responsive(fontSizes.lg, fontSizes.xl, fontSizes.xxl),
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: responsive(spacing.xs, spacing.sm, spacing.md),
     fontFamily: 'NB International Pro Bold',
-    lineHeight: responsive(fontSizes.title * 1.2, fontSizes.largeTitle * 1.2),
+    lineHeight: responsive(fontSizes.lg * 1.2, fontSizes.xl * 1.2, fontSizes.xxl * 1.2),
   },
   subtitle: {
-    fontSize: responsive(fontSizes.lg, fontSizes.xl),
+    fontSize: responsive(fontSizes.sm, fontSizes.md, fontSizes.lg),
     color: '#A7A6A5',
     textAlign: 'center',
     fontFamily: 'NB International Pro',
-    lineHeight: responsive(fontSizes.lg * 1.4, fontSizes.xl * 1.4),
-    paddingHorizontal: spacing.sm,
+    lineHeight: responsive(fontSizes.sm * 1.3, fontSizes.md * 1.3, fontSizes.lg * 1.3),
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  statsContainer: {
     paddingHorizontal: safeAreaPadding.horizontal,
-    paddingBottom: safeAreaPadding.bottom,
+    marginBottom: spacing.lg,
   },
-  refreshButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  refreshText: {
-    color: '#5252D7',
-    fontSize: fontSizes.md,
-    fontFamily: 'NB International Pro',
-  },
-  machineGrid: {
-    flexDirection: 'column',
-    marginBottom: spacing.xl,
+  statsGrid: {
+    flexDirection: 'row',
     gap: spacing.md,
   },
-  machineCard: {
-    width: '100%',
-    marginBottom: spacing.md,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(82, 82, 215, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.15)',
-    shadowColor: '#5252D7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardGradient: {
-    padding: spacing.lg,
-    backgroundColor: 'rgba(82, 82, 215, 0.05)',
-    borderRadius: 15,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  statCard: {
     flex: 1,
+    borderRadius: 16,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.2)',
+    ...shadows.medium,
   },
-  imageContainer: {
-    position: 'relative',
-    marginRight: spacing.md,
-    width: 80,
-    height: 80,
+  statContent: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  machineImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  statValue: {
+    fontSize: responsive(fontSizes.xl, fontSizes.xxl, fontSizes.xxxl),
+    fontWeight: 'bold',
+    color: '#5252D7',
+    fontFamily: 'NB International Pro Bold',
+    marginBottom: spacing.xs,
   },
-  statusIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  statLabel: {
+    fontSize: responsive(fontSizes.sm, fontSizes.md, fontSizes.lg),
+    color: '#A7A6A5',
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 10,
+  statUnit: {
+    fontSize: responsive(fontSizes.xs, fontSizes.sm, fontSizes.md),
+    color: '#5252D7',
     fontFamily: 'NB International Pro',
     fontWeight: '600',
   },
-  machineInfo: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-  },
-  machineName: {
-    fontSize: fontSizes.lg,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: spacing.xs,
-    fontFamily: 'NB International Pro Bold',
-  },
-  machineType: {
-    fontSize: fontSizes.sm,
-    color: '#5252D7',
-    marginBottom: spacing.sm,
-    fontFamily: 'NB International Pro',
-    fontWeight: '500',
-  },
-  revenueContainer: {
-    alignItems: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  revenueLabel: {
-    fontSize: 10,
-    color: '#A7A6A5',
-    marginBottom: 2,
-    fontFamily: 'NB International Pro',
-  },
-  revenueAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#06B6D4',
-    fontFamily: 'NB International Pro Bold',
-  },
-  machineLocation: {
-    fontSize: 11,
-    color: '#5252D7',
-    fontFamily: 'NB International Pro',
-    marginBottom: spacing.xs,
-  },
-  addressContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(82, 82, 215, 0.1)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.2)',
-    alignSelf: 'flex-start',
+    paddingVertical: spacing.xxl,
+    width: '100%',
   },
-  machineAddress: {
-    fontSize: 10,
-    color: '#747372',
+  loadingText: {
+    fontSize: responsive(fontSizes.lg, fontSizes.xl, fontSizes.xxl),
+    color: '#FFFFFF',
+    fontFamily: 'NB International Pro Bold',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    fontSize: responsive(fontSizes.md, fontSizes.lg, fontSizes.xl),
+    color: '#A7A6A5',
     fontFamily: 'NB International Pro',
-    marginRight: spacing.xs,
+    textAlign: 'center',
   },
-  copyIcon: {
-    fontSize: 10,
-    color: '#5252D7',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  statsCard: {
+  emptyContainer: {
     flex: 1,
-    backgroundColor: GLASSMORPHISM.card.background,
-    borderRadius: layout.cardRadius,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: GLASSMORPHISM.card.border,
+    justifyContent: 'center',
     alignItems: 'center',
-    ...GLASSMORPHISM.card.shadow,
+    paddingVertical: spacing.xxl,
+    width: '100%',
   },
-  statsTitle: {
-    fontSize: 12,
-    color: '#A7A6A5',
-    marginBottom: 8,
-    fontFamily: 'NB International Pro',
-  },
-  statsAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  emptyText: {
+    fontSize: responsive(fontSizes.lg, fontSizes.xl, fontSizes.xxl),
     color: '#FFFFFF',
     fontFamily: 'NB International Pro Bold',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: responsive(fontSizes.md, fontSizes.lg, fontSizes.xl),
+    color: '#A7A6A5',
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
   },
 })

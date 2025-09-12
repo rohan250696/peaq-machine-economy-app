@@ -68,8 +68,10 @@ export class NotificationService {
     this.notifications.unshift(newNotification)
     
     // Keep only last 100 notifications
-    if (this.notifications.length > 100) {
-      this.notifications = this.notifications.slice(0, 100)
+    if (this.notifications && Array.isArray(this.notifications) && this.notifications.length > 100) {
+      console.log('Notifications - truncating array, length:', this.notifications.length);
+      this.notifications = this.notifications.filter((_, index) => index < 100);
+      console.log('Notifications - after truncation, length:', this.notifications.length);
     }
 
     await this.saveNotifications()

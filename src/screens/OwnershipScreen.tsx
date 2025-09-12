@@ -6,6 +6,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList, Machine, Ownership } from '../types'
 import { GRADIENTS, GLASSMORPHISM } from '../constants'
+import { responsive } from '../utils/responsive'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { width, height } = Dimensions.get('window')
 
@@ -16,6 +18,7 @@ export default function OwnershipScreen() {
   const navigation = useNavigation<OwnershipScreenNavigationProp>()
   const route = useRoute<OwnershipScreenRouteProp>()
   const { machine, ownership } = route.params
+  const { colors } = useTheme()
   
   const [showConfetti, setShowConfetti] = useState(true)
   const [animatedPercentage, setAnimatedPercentage] = useState(0)
@@ -55,8 +58,58 @@ export default function OwnershipScreen() {
     navigation.navigate('MachineSelection')
   }
 
+  // Create dynamic styles based on theme
+  const dynamicStyles = React.useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.background,
+    },
+    title: {
+      color: colors.text,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+    },
+    cardBackground: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    cardTitle: {
+      color: colors.text,
+    },
+    cardSubtitle: {
+      color: colors.textSecondary,
+    },
+    percentageText: {
+      color: colors.primary,
+    },
+    earningsText: {
+      color: colors.success,
+    },
+    machineName: {
+      color: colors.text,
+    },
+    machineLocation: {
+      color: colors.textSecondary,
+    },
+    buttonText: {
+      color: colors.text,
+    },
+    statsValue: {
+      color: colors.primary,
+    },
+    statsLabel: {
+      color: colors.textSecondary,
+    },
+  }), [colors])
+
   return (
-    <View style={styles.container}>
+    <div style={{
+      height: '100vh',
+      backgroundColor: colors.background,
+      color: colors.text,
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }}>
       {/* Confetti Animation */}
       {showConfetti && (
         <View style={styles.confettiContainer}>
@@ -94,41 +147,40 @@ export default function OwnershipScreen() {
         </View>
       )}
 
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-        bounces={true}
-        alwaysBounceVertical={true}
-        scrollEventThrottle={16}
-        nestedScrollEnabled={true}
-        keyboardShouldPersistTaps="handled"
-        scrollEnabled={true}
-        removeClippedSubviews={false}
-      >
-        <LinearGradient
-          colors={['#0E0D0C', '#1A1A1A', '#0E0D0C']}
-          style={styles.gradientContent}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        {/* Modern Success Header */}
+        <MotiView
+          from={{ opacity: 0, translateY: -50 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{
+            type: 'spring',
+            damping: 15,
+            stiffness: 100,
+          }}
+          style={[styles.modernHeader, { paddingTop: responsive(90, 100, 110) }]}
         >
-          {/* Success Header */}
-          <MotiView
-            from={{ opacity: 0, translateY: -50 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{
-              type: 'spring',
-              damping: 15,
-              stiffness: 100,
-            }}
-            style={styles.header}
-          >
-            <Text style={styles.successEmoji}>🎉</Text>
-            <Text style={styles.title}>Congratulations!</Text>
-            <Text style={styles.subtitle}>
-              You now own a piece of {machine.name}
-            </Text>
-          </MotiView>
+          <View style={styles.headerContent}>
+            <MotiView
+              from={{ scale: 0, rotate: '0deg' }}
+              animate={{ scale: 1, rotate: '360deg' }}
+              transition={{
+                type: 'spring',
+                damping: 10,
+                stiffness: 100,
+                delay: 200,
+              }}
+              style={styles.successIcon}
+            >
+              <Text style={styles.successEmoji}>🎉</Text>
+            </MotiView>
+            
+            <View style={styles.headerText}>
+              <Text style={dynamicStyles.title}>Congratulations!</Text>
+              <Text style={dynamicStyles.subtitle}>
+                You now own a piece of {machine.name}
+              </Text>
+            </View>
+          </View>
+        </MotiView>
 
           {/* Ownership Card */}
           <MotiView
@@ -142,12 +194,7 @@ export default function OwnershipScreen() {
             }}
             style={styles.ownershipCard}
           >
-            <LinearGradient
-              colors={GRADIENTS.machine as [string, string, string]}
-              style={styles.cardGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
+            <View style={[styles.cardGradient, dynamicStyles.cardBackground]}>
               {/* Machine Image */}
               <View style={styles.machineImageContainer}>
                 <Image source={{ uri: machine.image }} style={styles.machineImage} />
@@ -158,34 +205,34 @@ export default function OwnershipScreen() {
 
               {/* Ownership Details */}
               <View style={styles.ownershipDetails}>
-                <Text style={styles.machineName}>{machine.name}</Text>
-                <Text style={styles.machineType}>{machine.type}</Text>
+                <Text style={[styles.machineName, dynamicStyles.machineName]}>{machine.name}</Text>
+                <Text style={[styles.machineType, dynamicStyles.cardSubtitle]}>{machine.type}</Text>
                 
                 {/* Percentage Display */}
                 <View style={styles.percentageContainer}>
-                  <Text style={styles.percentageLabel}>Ownership</Text>
-                  <Text style={styles.percentageValue}>
+                  <Text style={[styles.percentageLabel, dynamicStyles.statsLabel]}>Ownership</Text>
+                  <Text style={[styles.percentageValue, dynamicStyles.percentageText]}>
                     {animatedPercentage.toFixed(1)}%
                   </Text>
                 </View>
 
                 {/* Earnings Display */}
                 <View style={styles.earningsContainer}>
-                  <Text style={styles.earningsLabel}>Total Earnings</Text>
-                  <Text style={styles.earningsValue}>
+                  <Text style={[styles.earningsLabel, dynamicStyles.statsLabel]}>Total Earnings</Text>
+                  <Text style={[styles.earningsValue, dynamicStyles.earningsText]}>
                     {ownership.earnings.toFixed(4)} PEAQ
                   </Text>
                 </View>
 
                 {/* Tokens Display */}
                 <View style={styles.tokensContainer}>
-                  <Text style={styles.tokensLabel}>Tokens Owned</Text>
-                  <Text style={styles.tokensValue}>
+                  <Text style={[styles.tokensLabel, dynamicStyles.statsLabel]}>Tokens Owned</Text>
+                  <Text style={[styles.tokensValue, dynamicStyles.statsValue]}>
                     {ownership.tokens.toLocaleString()} / {ownership.totalTokens.toLocaleString()}
                   </Text>
                 </View>
               </View>
-            </LinearGradient>
+            </View>
           </MotiView>
 
           {/* Action Buttons */}
@@ -211,7 +258,7 @@ export default function OwnershipScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={styles.primaryButtonText}>View Dashboard</Text>
+                <Text style={[styles.primaryButtonText, dynamicStyles.buttonText]}>View Dashboard</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -220,22 +267,20 @@ export default function OwnershipScreen() {
               onPress={handleBackToMachines}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryButtonText}>Explore More Machines</Text>
+              <Text style={[styles.secondaryButtonText, dynamicStyles.buttonText]}>Explore More Machines</Text>
             </TouchableOpacity>
           </MotiView>
 
           {/* Extra content to ensure scrolling */}
           <View style={styles.extraContent}>
-            <Text style={styles.extraText}>🎉 Congratulations on your first machine ownership!</Text>
-            <Text style={styles.extraText}>💰 Start earning passive income from autonomous machines</Text>
-            <Text style={styles.extraText}>📈 Track your earnings in the dashboard</Text>
-            <Text style={styles.extraText}>🔄 Explore more machines to diversify your portfolio</Text>
-            <Text style={styles.extraText}>🚀 Join the machine economy revolution!</Text>
-            <Text style={styles.extraText}>💎 Your fractional ownership is now live</Text>
+            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🎉 Congratulations on your first machine ownership!</Text>
+            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>💰 Start earning passive income from autonomous machines</Text>
+            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>📈 Track your earnings in the dashboard</Text>
+            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🔄 Explore more machines to diversify your portfolio</Text>
+            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🚀 Join the machine economy revolution!</Text>
+            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>💎 Your fractional ownership is now live</Text>
           </View>
-        </LinearGradient>
-      </ScrollView>
-    </View>
+    </div>
   )
 }
 
@@ -266,13 +311,37 @@ const styles = StyleSheet.create({
   },
   gradientContent: {
     minHeight: height,
-    paddingHorizontal: 24,
-    paddingTop: 80,
-    paddingBottom: 100,
+    paddingHorizontal: 32,
+    paddingTop: 100,
+    paddingBottom: 120,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  modernHeader: {
+    alignItems: 'center',
+    marginBottom: 40,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  headerContent: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  successIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(82, 82, 215, 0.3)',
+  },
+  headerText: {
+    alignItems: 'center',
+    gap: 8,
   },
   successEmoji: {
     fontSize: 64,
@@ -281,25 +350,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 8,
     fontFamily: 'NB International Pro Bold',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 18,
-    color: '#A7A6A5',
     textAlign: 'center',
     fontFamily: 'NB International Pro',
   },
   ownershipCard: {
-    marginBottom: 32,
+    marginBottom: 40,
+    marginHorizontal: 8,
     borderRadius: 20,
     overflow: 'hidden',
     ...GLASSMORPHISM.shadow,
   },
   cardGradient: {
-    padding: 24,
+    padding: 32,
   },
   machineImageContainer: {
     position: 'relative',
@@ -395,6 +463,8 @@ const styles = StyleSheet.create({
   },
   actionsContainer: {
     marginBottom: 40,
+    paddingHorizontal: 8,
+    gap: 20,
   },
   primaryButton: {
     marginBottom: 16,
@@ -431,8 +501,9 @@ const styles = StyleSheet.create({
   },
   extraContent: {
     marginTop: 40,
-    paddingHorizontal: 20,
-    paddingVertical: 30,
+    marginHorizontal: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     backgroundColor: 'rgba(82, 82, 215, 0.05)',
     borderRadius: 16,
     borderWidth: 1,
@@ -442,7 +513,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#A7A6A5',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
     fontFamily: 'NB International Pro',
     lineHeight: 20,
   },

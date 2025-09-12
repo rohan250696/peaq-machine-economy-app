@@ -12,6 +12,14 @@ export interface Machine {
     lat: number
     lng: number
   }
+  // Contract data fields (optional for backward compatibility)
+  price?: number
+  platformFeeBps?: number
+  revenueShareBps?: number
+  sharesPerPurchase?: number
+  totalShares?: number
+  unallocatedRevenue?: number
+  ownershipBps?: number
 }
 
 export interface User {

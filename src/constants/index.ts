@@ -7,9 +7,9 @@ export const MOCK_MACHINES: Machine[] = [
     name: 'RoboCafe',
     type: 'RoboCafe',
     image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=300&fit=crop',
-    address: '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
-    revenue: 0.32,
-    totalRevenue: 1250.75,
+    address: '',
+    revenue: 0.00,
+    totalRevenue: 0,
     isActive: true,
     location: {
       name: 'Main Exhibition',
@@ -22,9 +22,9 @@ export const MOCK_MACHINES: Machine[] = [
     name: 'Humanoid Dispenser',
     type: 'Humanoid',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&h=300&fit=crop',
-    address: '0x8ba1f109551bD432803012645Hac136c4c8b8b8b',
-    revenue: 0.18,
-    totalRevenue: 890.25,
+    address: '',
+    revenue: 0,
+    totalRevenue: 0,
     isActive: true,
     location: {
       name: 'Conference Hall A',
@@ -105,3 +105,10 @@ export const MACHINE_ACTIONS = {
     description: 'Custom printed t-shirt from our humanoid factory',
   },
 }
+
+export const AGUNG_TESTNET_MACHINE_MANAGER_ADDRESS = 
+'0xed043CE0D946706c532C8E346E96143088183E90';
+export const PEAQ_MACHINE_MANAGER_ADDRESS = 
+'0x0000000000000000000000000000000000000000';
+
+export const TOKEN_ADDRESS = '0x0000000000000000000000000000000000000809';
