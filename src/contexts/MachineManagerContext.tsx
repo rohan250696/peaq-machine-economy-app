@@ -35,9 +35,9 @@
  * ```
  */
 
-import React, { createContext, useContext, ReactNode, useState, useCallback } from 'react'
+import React, { createContext, useContext, ReactNode } from 'react'
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useConfig, usePublicClient } from 'wagmi'
-import { parseEther, formatEther, isAddress } from 'viem'
+import { parseEther, formatEther } from 'viem'
 import MachineManagerABI from '../abi/MachineManagerABI.json'
 import ERC20ABI from '../abi/ERC20.json'
 import { 
@@ -81,94 +81,16 @@ function convertMachineIdToBigInt(machineId: string): bigint {
   return match ? BigInt(match[1]) : BigInt(1)
 }
 
-// Error handling utilities
-function isAlreadyKnownError(error: any): boolean {
-  return error?.message?.includes('already known') || 
-         error?.details === 'already known' ||
-         error?.cause?.message === 'already known'
-}
-
-function isInsufficientFundsError(error: any): boolean {
-  return error?.message?.includes('insufficient funds') ||
-         error?.message?.includes('insufficient balance')
-}
-
-function isRejectedError(error: any): boolean {
-  return error?.message?.includes('User rejected') ||
-         error?.message?.includes('user rejected') ||
-         error?.code === 4001
-}
-
-function getUserFriendlyErrorMessage(error: any): string {
-  if (isAlreadyKnownError(error)) {
-    return 'Transaction is already pending. Please wait for it to be confirmed or check your wallet.'
-  }
-  if (isInsufficientFundsError(error)) {
-    return 'Insufficient funds. Please check your balance and try again.'
-  }
-  if (isRejectedError(error)) {
-    return 'Transaction was rejected. Please try again.'
-  }
-  if (error?.message?.includes('gas')) {
-    return 'Transaction failed due to gas issues. Please try again with higher gas limit.'
-  }
-  return error?.message || 'An unexpected error occurred. Please try again.'
-}
-
-// Transaction retry utility with exponential backoff
-async function retryTransaction<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> {
-  let lastError: any
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation()
-    } catch (error) {
-      lastError = error
-      
-      // Don't retry for certain errors
-      if (isRejectedError(error) || isInsufficientFundsError(error)) {
-        throw error
-      }
-      
-      // For "already known" errors, don't retry immediately
-      if (isAlreadyKnownError(error) && attempt === 0) {
-        throw error
-      }
-      
-      if (attempt < maxRetries) {
-        const delay = baseDelay * Math.pow(2, attempt)
-        console.log(`Transaction attempt ${attempt + 1} failed, retrying in ${delay}ms...`)
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
-    }
-  }
-  
-  throw lastError
-}
-
-interface TransactionState {
-  hash?: string
-  status: 'idle' | 'pending' | 'success' | 'error'
-  error?: string
-  userFriendlyError?: string
-}
-
 interface MachineManagerContextType {
   // ERC20 Functions
   approveToken: (spender: string, amount: string) => Promise<string | undefined>
   isApproving: boolean
   approveError: Error | null
-  approveTransaction: TransactionState
   
   // Machine Manager Functions
   useMachine: (machineId: string) => Promise<string | undefined>
   isUsingMachine: boolean
   useMachineError: Error | null
-  useMachineTransaction: TransactionState
   
   // Read Functions
   getClaimableFor: (machineId: string, user: string) => Promise<string>
@@ -186,13 +108,7 @@ interface MachineManagerContextType {
     machineInfo: GetMachineReturn | null
     userBalance: string
     transactionHash: string | undefined
-    error?: string
-    userFriendlyError?: string
   }>
-  
-  // Transaction Management
-  clearTransactionState: (type: 'approve' | 'useMachine') => void
-  retryLastTransaction: () => Promise<void>
   
   // Loading states
   isLoading: boolean
@@ -210,106 +126,34 @@ export function MachineManagerProvider({ children }: MachineManagerProviderProps
   const config = useConfig()
   const publicClient = usePublicClient()
   
-  // Transaction state management
-  const [approveTransaction, setApproveTransaction] = useState<TransactionState>({ status: 'idle' })
-  const [useMachineTransaction, setUseMachineTransaction] = useState<TransactionState>({ status: 'idle' })
-  const [lastTransactionParams, setLastTransactionParams] = useState<any>(null)
-  
   // Write contract hook
   const { writeContract: writeContract, data: hash, error: writeError } = useWriteContract()
 
   // Transaction receipt hooks
-  const { isLoading: isApproving, isSuccess: isApproveSuccess, isError: isApproveError } = useWaitForTransactionReceipt({
+  const { isLoading: isApproving } = useWaitForTransactionReceipt({
     hash: hash,
   })
 
-  const { isLoading: isUsingMachine, isSuccess: isUseMachineSuccess, isError: isUseMachineError } = useWaitForTransactionReceipt({
+  const { isLoading: isUsingMachine } = useWaitForTransactionReceipt({
     hash: hash,
   })
-
-  // Update transaction states based on receipt status
-  React.useEffect(() => {
-    if (hash && isApproving) {
-      setApproveTransaction({
-        hash,
-        status: 'pending'
-      })
-    }
-    if (hash && isApproveSuccess) {
-      setApproveTransaction({
-        hash,
-        status: 'success'
-      })
-    }
-    if (hash && isApproveError) {
-      setApproveTransaction({
-        hash,
-        status: 'error',
-        error: (writeError as unknown as Error)?.message || 'Unknown error',
-        userFriendlyError: getUserFriendlyErrorMessage(writeError)
-      })
-    }
-  }, [hash, isApproving, isApproveSuccess, isApproveError, writeError])
-
-  React.useEffect(() => {
-    if (hash && isUsingMachine) {
-      setUseMachineTransaction({
-        hash,
-        status: 'pending'
-      })
-    }
-    if (hash && isUseMachineSuccess) {
-      setUseMachineTransaction({
-        hash,
-        status: 'success'
-      })
-    }
-    if (hash && isUseMachineError) {
-      setUseMachineTransaction({
-        hash,
-        status: 'error',
-        error: (writeError as unknown as Error)?.message || 'Unknown error',
-        userFriendlyError: getUserFriendlyErrorMessage(writeError)
-      })
-    }
-  }, [hash, isUsingMachine, isUseMachineSuccess, isUseMachineError, writeError])
 
   
 
   // ERC20 Approve function
   const approveToken = async (spender: string, amount: string): Promise<string | undefined> => {
     try {
-      // Validate inputs
-      if (!isAddress(spender)) {
-        throw new Error('Invalid spender address')
-      }
-      if (!amount || parseFloat(amount) <= 0) {
-        throw new Error('Invalid amount')
-      }
-
-      setApproveTransaction({ status: 'pending' })
-      setLastTransactionParams({ type: 'approve', spender, amount })
-
       const parsedAmount = parseEther(amount)
-      
-      await retryTransaction(async () => {
-        writeContract({
-          address: PEAQ_TOKEN_ADDRESS as `0x${string}`,
-          abi: ERC20ABI,
-          functionName: 'approve',
-          args: [spender as `0x${string}`, parsedAmount],
-          gas: 600_000n,
-        })
+      writeContract({
+        address: PEAQ_TOKEN_ADDRESS as `0x${string}`,
+        abi: ERC20ABI,
+        functionName: 'approve',
+        args: [spender as `0x${string}`, parsedAmount],
+        gas: 500_000n,
       })
-
       return hash || undefined
     } catch (error) {
       console.error('Error approving token:', error)
-      setApproveTransaction({
-        status: 'error',
-        error: (error as Error)?.message || 'Unknown error',
-        userFriendlyError: getUserFriendlyErrorMessage(error)
-      })
       throw error
     }
   }
@@ -317,32 +161,17 @@ export function MachineManagerProvider({ children }: MachineManagerProviderProps
   // Use Machine function
   const useMachine = async (machineId: string): Promise<string | undefined> => {
     try {
-      if (!machineId) {
-        throw new Error('Machine ID is required')
-      }
-
-      setUseMachineTransaction({ status: 'pending' })
-      setLastTransactionParams({ type: 'useMachine', machineId })
-
       const numericId = convertMachineIdToBigInt(machineId)
 
-      await retryTransaction(async () => {
-        writeContract({
-          address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
-          abi: MachineManagerABI,
-          functionName: 'useMachine',
-          args: [numericId],
-        })
+      writeContract({
+        address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+        abi: MachineManagerABI,
+        functionName: 'useMachine',
+        args: [numericId],
       })
-
       return hash || undefined
     } catch (error) {
       console.error('Error using machine:', error)
-      setUseMachineTransaction({
-        status: 'error',
-        error: (error as Error)?.message || 'Unknown error',
-        userFriendlyError: getUserFriendlyErrorMessage(error)
-      })
       throw error
     }
   }
@@ -432,22 +261,21 @@ export function MachineManagerProvider({ children }: MachineManagerProviderProps
       console.log('Raw contract result:', machines)
       
       return machines.map((machine: any, index: number) => {
-        console.log(`Machine ${index}:`, machine)
-        
         return {
-          name: machine[0] as string || `Machine ${index + 1}`,
-          machineOnChainAddr: machine[1] as string || '',
-          price: machine[2] ? formatEther(machine[2] as bigint) : '0',
-          platformFeeBps: machine[3] as number || 0,
-          revenueShareBps: machine[4] as number || 0,
-          sharesPerPurchase: machine[5] ? formatEther(machine[5] as bigint) : '0',
-          totalShares: machine[6] ? formatEther(machine[6] as bigint) : '0',
-          lifetimeRevenue: machine[7] ? formatEther(machine[7] as bigint) : '0',
-          rewardPerShare: machine[8] ? formatEther(machine[8] as bigint) : '0',
-          unallocatedRevenue: machine[9] ? formatEther(machine[9] as bigint) : '0',
-          exists: machine[10] as boolean || false,
+          name: machine.name || `Machine ${index + 1}`,
+          machineOnChainAddr: machine.machineOnChainAddr || '',
+          price: machine.price ? formatEther(machine.price as bigint) : '0',
+          platformFeeBps: Number(machine.platformFeeBps) || 0,       // no formatEther
+          revenueShareBps: Number(machine.revenueShareBps) || 0,     // no formatEther
+          sharesPerPurchase: machine.sharesPerPurchase?.toString() || '0', // plain integer
+          totalShares: machine.totalShares?.toString() || '0',       // plain integer
+          lifetimeRevenue: machine.lifetimeRevenue ? formatEther(machine.lifetimeRevenue as bigint) : '0',
+          rewardPerShare: machine.rewardPerShare ? formatEther(machine.rewardPerShare as bigint) : '0', // scaled
+          unallocatedRevenue: machine.unallocatedRevenue ? formatEther(machine.unallocatedRevenue as bigint) : '0',
+          exists: machine.exists || false,
         }
       })
+      
     } catch (error) {
       console.error('Error getting all machines:', error)
       throw error
@@ -528,42 +356,9 @@ export function MachineManagerProvider({ children }: MachineManagerProviderProps
       }
     } catch (error) {
       console.error('Error interacting with machine:', error)
-      return {
-        success: false,
-        machineInfo: null,
-        userBalance: '0',
-        transactionHash: undefined,
-        error: (error as Error)?.message || 'Unknown error',
-        userFriendlyError: getUserFriendlyErrorMessage(error)
-      }
-    }
-  }
-
-  // Transaction management functions
-  const clearTransactionState = useCallback((type: 'approve' | 'useMachine') => {
-    if (type === 'approve') {
-      setApproveTransaction({ status: 'idle' })
-    } else if (type === 'useMachine') {
-      setUseMachineTransaction({ status: 'idle' })
-    }
-  }, [])
-
-  const retryLastTransaction = useCallback(async () => {
-    if (!lastTransactionParams) {
-      throw new Error('No previous transaction to retry')
-    }
-
-    try {
-      if (lastTransactionParams.type === 'approve') {
-        await approveToken(lastTransactionParams.spender, lastTransactionParams.amount)
-      } else if (lastTransactionParams.type === 'useMachine') {
-        await useMachine(lastTransactionParams.machineId)
-      }
-    } catch (error) {
-      console.error('Error retrying transaction:', error)
       throw error
     }
-  }, [lastTransactionParams])
+  }
 
   const isLoading = isApproving || isUsingMachine
   const error = writeError
@@ -573,13 +368,11 @@ export function MachineManagerProvider({ children }: MachineManagerProviderProps
     approveToken,
     isApproving,
     approveError: writeError,
-    approveTransaction,
     
     // Machine Manager Functions
     useMachine,
     isUsingMachine,
     useMachineError: writeError,
-    useMachineTransaction,
     
     // Read Functions
     getClaimableFor,
@@ -593,10 +386,6 @@ export function MachineManagerProvider({ children }: MachineManagerProviderProps
     
     // Complete Machine Interaction
     interactWithMachine,
-    
-    // Transaction Management
-    clearTransactionState,
-    retryLastTransaction,
     
     // Loading states
     isLoading,
@@ -745,6 +534,31 @@ export function useTokenBalance(account: string) {
   }
 }
 
+// Hook for getting user's share balance for a specific machine
+export function useUserShareBalance(machineId: string, user: string) {
+  // Convert string ID to numeric ID for contract calls
+  const numericId = React.useMemo(() => {
+    return convertMachineIdToBigInt(machineId)
+  }, [machineId])
+
+  const { data, error, isLoading, refetch } = useReadContract({
+    address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+    abi: MachineManagerABI,
+    functionName: 'balanceOf',
+    args: [user as `0x${string}`, numericId],
+    query: {
+      enabled: !!user && !!numericId,
+    },
+  })
+
+  return {
+    shareBalance: data ? (data as bigint).toString() : '0',
+    error,
+    isLoading,
+    refetch,
+  }
+}
+
 // Hook for getting all machines
 export function useAllMachines() {
   const { data, error, isLoading, refetch } = useReadContract({
@@ -755,20 +569,20 @@ export function useAllMachines() {
   })
 
   const machines: GetAllMachinesReturn = data ? (data as any[]).map((machine: any, index: number) => {
-    console.log(`Hook Machine ${index}:`, machine)
+    console.log('useAllMachines processing machine:', machine)
     
     return {
-      name: machine[0] as string || `Machine ${index + 1}`,
-      machineOnChainAddr: machine[1] as string || '',
-      price: machine[2] ? formatEther(machine[2] as bigint) : '0',
-      platformFeeBps: machine[3] as number || 0,
-      revenueShareBps: machine[4] as number || 0,
-      sharesPerPurchase: machine[5] ? formatEther(machine[5] as bigint) : '0',
-      totalShares: machine[6] ? formatEther(machine[6] as bigint) : '0',
-      lifetimeRevenue: machine[7] ? formatEther(machine[7] as bigint) : '0',
-      rewardPerShare: machine[8] ? formatEther(machine[8] as bigint) : '0',
-      unallocatedRevenue: machine[9] ? formatEther(machine[9] as bigint) : '0',
-      exists: machine[10] as boolean || false,
+      name: machine.name as string || `Machine ${index + 1}`,
+      machineOnChainAddr: machine.machineOnChainAddr as string || '',
+      price: machine.price ? formatEther(machine.price as bigint) : '0',
+      platformFeeBps: machine.platformFeeBps as number || 0,
+      revenueShareBps: machine.revenueShareBps as number || 0,
+      sharesPerPurchase: machine.sharesPerPurchase ? formatEther(machine.sharesPerPurchase as bigint) : '0',
+      totalShares: machine.totalShares ? formatEther(machine.totalShares as bigint) : '0',
+      lifetimeRevenue: machine.lifetimeRevenue ? formatEther(machine.lifetimeRevenue as bigint) : '0',
+      rewardPerShare: machine.rewardPerShare ? formatEther(machine.rewardPerShare as bigint) : '0',
+      unallocatedRevenue: machine.unallocatedRevenue ? formatEther(machine.unallocatedRevenue as bigint) : '0',
+      exists: machine.exists as boolean || false,
     }
   }) : []
 

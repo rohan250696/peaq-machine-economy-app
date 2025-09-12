@@ -4,6 +4,7 @@ import { MotiView } from 'moti'
 import { Machine } from '../types'
 import { useAccount } from 'wagmi'
 import { useMachineManager } from '../contexts/MachineManagerContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { 
   spacing, 
   fontSizes, 
@@ -41,6 +42,7 @@ export default function MachineCard({
   const isGridLayout = columns > 1
   const { address } = useAccount()
   const { getTokenBalance } = useMachineManager()
+  const { colors } = useTheme()
 
   // Check if user has enough PEAQ balance
   useEffect(() => {
@@ -64,12 +66,59 @@ export default function MachineCard({
     checkBalance()
   }, [address, machine.price, getTokenBalance])
 
-  const isDisabled = machine.price && hasEnoughBalance === false
+  // Create dynamic styles based on theme
+  const dynamicStyles = React.useMemo(() => StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+    },
+    category: {
+      color: colors.textSecondary,
+    },
+    productName: {
+      color: colors.text,
+    },
+    description: {
+      color: colors.textSecondary,
+    },
+    featureText: {
+      color: colors.primary,
+    },
+    mainPrice: {
+      color: colors.text,
+    },
+    priceDescription: {
+      color: colors.textSecondary,
+    },
+    earningsTitle: {
+      color: colors.text,
+    },
+    legendText: {
+      color: colors.textSecondary,
+    },
+    machineAddressLabel: {
+      color: colors.text,
+    },
+    machineAddressStatus: {
+      color: colors.success,
+    },
+    machineAddressText: {
+      color: colors.primary,
+    },
+    walletLabel: {
+      color: colors.textSecondary,
+    },
+    walletAddress: {
+      color: colors.primary,
+    },
+  }), [colors])
+
+  const isDisabled = false // Allow clicking even with insufficient balance
 
   return (
     <MotiView
       from={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: isDisabled ? 0.6 : 1, scale: 1 }}
+      animate={{ opacity: 1, scale: 1 }}
       transition={{
         type: 'spring',
         damping: 15,
@@ -79,26 +128,29 @@ export default function MachineCard({
       style={[
         styles.container,
         { width: isGridLayout ? cardWidth : '100%' },
-        isDisabled ? styles.disabledContainer : null,
       ]}
     >
       <TouchableOpacity
         style={[
           styles.card,
+          dynamicStyles.card,
           isHovered && styles.cardHovered
         ]}
-        onPress={() => !isDisabled && onPress(machine)}
-        activeOpacity={isDisabled ? 1 : 0.8}
-        disabled={!!isDisabled}
+        onPress={() => onPress(machine)}
+        activeOpacity={0.8}
         {...(Platform.OS === 'web' && {
-          onMouseEnter: () => !isDisabled && setIsHovered(true),
-          onMouseLeave: () => !isDisabled && setIsHovered(false),
+          onMouseEnter: () => setIsHovered(true),
+          onMouseLeave: () => setIsHovered(false),
         })}
       >
         {/* Product Image Section */}
         <View style={styles.imageSection}>
           <Image 
-            source={{ uri: machine.image }} 
+            source={
+              machine.image?.includes('coffee-robo-image.png') || machine.type === 'RoboCafe'
+                ? require('../../assets/coffee-robo-image.png')
+                : require('../../assets/humanoid.png')
+            }
             style={styles.productImage}
             resizeMode="cover"
           />
@@ -124,93 +176,78 @@ export default function MachineCard({
         {/* Product Info Section */}
         <View style={styles.productInfo}>
           {/* Category */}
-          <Text style={styles.category}>PEAQ MACHINE</Text>
+          <Text style={[styles.category, dynamicStyles.category]}>peaq MACHINE</Text>
           
           {/* Product Name */}
-          <Text style={styles.productName} numberOfLines={2}>
+          <Text style={[styles.productName, dynamicStyles.productName]} numberOfLines={2}>
             {machine.type === 'RoboCafe' ? '☕ ' : '🤖 '}{machine.name}
           </Text>
           
           {/* Description */}
-          <Text style={styles.description} numberOfLines={2}>
+          <Text style={[styles.description, dynamicStyles.description]} numberOfLines={2}>
             {machine.type} • {machine.location.name}
           </Text>
           
           {/* Features Tags */}
           <View style={styles.featuresContainer}>
             <View style={styles.featureTag}>
-              <Text style={styles.featureText}>Live Revenue</Text>
+              <Text style={[styles.featureText, dynamicStyles.featureText]}>Live Revenue</Text>
             </View>
             <View style={styles.featureTag}>
-              <Text style={styles.featureText}>Peaq Network</Text>
+              <Text style={[styles.featureText, dynamicStyles.featureText]}>peaq Network</Text>
             </View>
             <View style={styles.featureTag}>
-              <Text style={styles.featureText}>Decentralized</Text>
+              <Text style={[styles.featureText, dynamicStyles.featureText]}>Decentralized</Text>
             </View>
           </View>
           
           {/* Main Price Display */}
           <View style={styles.mainPriceSection}>
-            <Text style={styles.mainPrice}>
-              {isLoading ? 'Loading...' : machine.price ? `${machine.price} PEAQ` : `${machine.revenue.toFixed(2)} PEAQ`}
+            <Text style={[styles.mainPrice, dynamicStyles.mainPrice]}>
+              {isLoading ? 'Loading...' : machine.price ? `${machine.price} peaq` : `${machine.revenue.toFixed(2)} peaq`}
             </Text>
-            <Text style={styles.priceDescription}>
+            <Text style={[styles.priceDescription, dynamicStyles.priceDescription]}>
               {machine.type === 'RoboCafe' ? 'Cost to order one coffee' : 'Cost per interaction or rental slot'}
             </Text>
-            {machine.price && (
-              <Text style={styles.fiatPrice}>
-                ~${(parseFloat(machine.price.toString()) * 1.0).toFixed(2)} USD
-              </Text>
-            )}
           </View>
           
           {/* Earnings Breakdown */}
           {machine.price && (
             <View style={styles.earningsSection}>
-              <Text style={styles.earningsTitle}>How Earnings Are Distributed</Text>
+              <Text style={[styles.earningsTitle, dynamicStyles.earningsTitle]}>How Earnings Are Distributed</Text>
               
               {/* Visual Earnings Breakdown */}
               <View style={styles.earningsBreakdown}>
                 <View style={styles.earningsBar}>
-                  <View style={[styles.earningsSegment, styles.platformFee, { width: `${(machine.platformFeeBps || 0) / 10}%` }]} />
-                  <View style={[styles.earningsSegment, styles.ownerShare, { width: `${(machine.revenueShareBps || 0) / 10}%` }]} />
+                  <View style={[styles.earningsSegment, styles.platformFee, { width: `${(machine.platformFeeBps || 0) / 100}%` }]} />
+                  <View style={[styles.earningsSegment, styles.ownerShare, { width: `${(machine.revenueShareBps || 0) / 100}%` }]} />
                   <View style={[styles.earningsSegment, styles.operatorShare, { width: `${100 - ((machine.platformFeeBps || 0) + (machine.revenueShareBps || 0)) / 10}%` }]} />
                 </View>
                 
                 <View style={styles.earningsLegend}>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendColor, styles.platformFee]} />
-                    <Text style={styles.legendText}>Platform Fee: {((machine.platformFeeBps || 0) / 100).toFixed(1)}%</Text>
+                    <Text style={[styles.legendText, dynamicStyles.legendText]}>Platform Fee: {((machine.platformFeeBps || 0) / 100).toFixed(1)}%</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendColor, styles.ownerShare]} />
-                    <Text style={styles.legendText}>Owners: {((machine.revenueShareBps || 0) / 100).toFixed(1)}%</Text>
+                    <Text style={[styles.legendText, dynamicStyles.legendText]}>Owners: {((machine.revenueShareBps || 0) / 100).toFixed(1)}%</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendColor, styles.operatorShare]} />
-                    <Text style={styles.legendText}>Operator: {(100 - ((machine.platformFeeBps || 0) + (machine.revenueShareBps || 0)) / 100).toFixed(1)}%</Text>
+                    <Text style={[styles.legendText, dynamicStyles.legendText]}>Operator: {(100 - ((machine.platformFeeBps || 0) + (machine.revenueShareBps || 0)) / 100).toFixed(1)}%</Text>
                   </View>
                 </View>
               </View>
               
-              {/* Shares Explanation */}
-              <View style={styles.sharesSection}>
-                <Text style={styles.sharesTitle}>Ownership Shares</Text>
-                <Text style={styles.sharesDescription}>
-                  Every time you use this machine, you also become a co-owner! You get {machine.sharesPerPurchase || 0} fractional shares.
-                </Text>
-                <Text style={styles.sharesSubtext}>
-                  These shares entitle you to {(machine.revenueShareBps || 0) / 100}% of future earnings from this machine.
-                </Text>
-              </View>
             </View>
           )}
           
           {/* Machine Address Section */}
           <View style={styles.machineAddressSection}>
-            <Text style={styles.machineAddressLabel}>Machine Identity</Text>
+            <Text style={[styles.machineAddressLabel, dynamicStyles.machineAddressLabel]}>Machine Identity</Text>
             <View style={styles.machineAddressContainer}>
-              <Text style={styles.machineAddressStatus}>
+              <Text style={[styles.machineAddressStatus, dynamicStyles.machineAddressStatus]}>
                 {machine.address ? '✅ Connected' : '⏳ Not yet assigned'}
               </Text>
               {machine.address && (
@@ -219,7 +256,7 @@ export default function MachineCard({
                   onPress={() => onCopyAddress(machine.address)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.machineAddressText}>
+                  <Text style={[styles.machineAddressText, dynamicStyles.machineAddressText]}>
                     {machine.address.slice(0, 8)}...{machine.address.slice(-6)}
                   </Text>
                 </TouchableOpacity>
@@ -228,7 +265,7 @@ export default function MachineCard({
           </View>
           
           {/* Balance Indicator */}
-          {machine.price && hasEnoughBalance !== null && (
+          {/* {machine.price && hasEnoughBalance !== null && (
             <View style={styles.balanceIndicator}>
               <Text style={[
                 styles.balanceText,
@@ -237,10 +274,10 @@ export default function MachineCard({
                 {hasEnoughBalance ? '✅ Sufficient Balance' : '❌ Insufficient Balance'}
               </Text>
             </View>
-          )}
+          )} */}
           
           {/* Wallet Address */}
-          {address && (
+          {/* {address && (
             <TouchableOpacity 
               style={styles.walletContainer}
               onPress={() => onCopyAddress(address)}
@@ -251,7 +288,7 @@ export default function MachineCard({
                 {address.slice(0, 6)}...{address.slice(-4)}
               </Text>
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
       </TouchableOpacity>
     </MotiView>
@@ -482,34 +519,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     color: '#9CA3AF',
     fontFamily: 'NB International Pro',
-  },
-  sharesSection: {
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: 'rgba(82, 82, 215, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.2)',
-  },
-  sharesTitle: {
-    fontSize: fontSizes.sm,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: 'NB International Pro',
-    marginBottom: spacing.xs,
-  },
-  sharesDescription: {
-    fontSize: fontSizes.sm,
-    color: '#E5E7EB',
-    fontFamily: 'NB International Pro',
-    lineHeight: 20,
-    marginBottom: spacing.xs,
-  },
-  sharesSubtext: {
-    fontSize: fontSizes.xs,
-    color: '#9CA3AF',
-    fontFamily: 'NB International Pro',
-    fontStyle: 'italic',
   },
   machineAddressSection: {
     marginTop: spacing.md,

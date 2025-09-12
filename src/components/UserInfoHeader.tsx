@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Platform } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Platform, Clipboard } from 'react-native'
 import { MotiView } from 'moti'
 import { usePrivy, useWallets, useLogout } from '../hooks/usePlatformAuth'
 import { useAccount, useBalance } from '../hooks/usePlatformWagmi'
@@ -54,10 +54,39 @@ export default function UserInfoHeader() {
     }
   }
 
+  const handleCopyAddress = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        // Use navigator.clipboard for web
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(userAddress)
+          Alert.alert('Copied!', 'Wallet address copied to clipboard')
+        } else {
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea')
+          textArea.value = userAddress
+          document.body.appendChild(textArea)
+          textArea.select()
+          document.execCommand('copy')
+          document.body.removeChild(textArea)
+          Alert.alert('Copied!', 'Wallet address copied to clipboard')
+        }
+      } else {
+        // Use React Native Clipboard for mobile
+        await Clipboard.setString(userAddress)
+        Alert.alert('Copied!', 'Wallet address copied to clipboard')
+      }
+    } catch (error) {
+      console.error('Copy failed:', error)
+      Alert.alert('Copy Failed', 'Please try again')
+    }
+  }
+
 
   // Extract user name and email from different authentication methods
   const getUserInfo = () => {
     // Check Google authentication
+    console.log('privyUser', privyUser);
     if (privyUser?.google && (privyUser.google as any)?.name && (privyUser.google as any)?.email) {
       return {
         name: (privyUser.google as any).name,
@@ -74,10 +103,10 @@ export default function UserInfoHeader() {
     }
     
     // Check Twitter authentication
-    if (privyUser?.twitter && (privyUser.twitter as any)?.name && (privyUser.twitter as any)?.email) {
+    if (privyUser?.twitter && (privyUser.twitter as any)?.name) {
       return {
         name: (privyUser.twitter as any).name,
-        email: (privyUser.twitter as any).email
+        email: (privyUser.twitter as any).username || (privyUser.twitter as any).subject || 'twitter@example.com'
       }
     }
     
@@ -116,8 +145,8 @@ export default function UserInfoHeader() {
     }
     
     // Check Twitter authentication for avatar
-    if (privyUser?.twitter && (privyUser.twitter as any)?.profileImageUrl) {
-      return (privyUser.twitter as any).profileImageUrl
+    if (privyUser?.twitter && (privyUser.twitter as any)?.profilePictureUrl) {
+      return (privyUser.twitter as any).profilePictureUrl
     }
     
     // No avatar found, use default
@@ -248,9 +277,18 @@ export default function UserInfoHeader() {
                 <View style={styles.userProfileInfo}>
                   <Text style={dynamicStyles.menuUserName}>{userName}</Text>
                   <Text style={dynamicStyles.menuUserEmail}>{userEmail}</Text>
-                  <Text style={dynamicStyles.menuUserAddress}>
-                    {safeTruncateAddress(userAddress)}
-                  </Text>
+                  <View style={styles.addressContainer}>
+                    <Text style={dynamicStyles.menuUserAddress}>
+                      {safeTruncateAddress(userAddress)}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.copyButton}
+                      onPress={handleCopyAddress}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.copyIcon}>📋</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
 
@@ -381,9 +419,18 @@ export default function UserInfoHeader() {
                 <View style={styles.userProfileInfo}>
                   <Text style={dynamicStyles.menuUserName}>{userName}</Text>
                   <Text style={dynamicStyles.menuUserEmail}>{userEmail}</Text>
-                  <Text style={dynamicStyles.menuUserAddress}>
-                    {safeTruncateAddress(userAddress)}
-                  </Text>
+                  <View style={styles.addressContainer}>
+                    <Text style={dynamicStyles.menuUserAddress}>
+                      {safeTruncateAddress(userAddress)}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.copyButton}
+                      onPress={handleCopyAddress}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.copyIcon}>📋</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
 
@@ -577,6 +624,21 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontFamily: 'NB International Pro',
     marginTop: spacing.xs,
+    flex: 1,
+  },
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  copyButton: {
+    marginLeft: spacing.sm,
+    padding: spacing.xs,
+    borderRadius: 4,
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+  },
+  copyIcon: {
+    fontSize: fontSizes.xs,
   },
 
   // Separator

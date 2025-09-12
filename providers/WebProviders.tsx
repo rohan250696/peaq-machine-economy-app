@@ -32,8 +32,8 @@ export default function WebProviders({ children }: WebProvidersProps) {
       config={{
         loginMethods: ['google', 'twitter', 'apple'],
         embeddedWallets: { createOnLogin: 'users-without-wallets' },
-        defaultChain: peaqChain,
-        supportedChains: [peaqChain, agungTestnet],
+        defaultChain: peaq,
+        supportedChains: [peaq, agungTestnet],
       }}
     >
       <QueryClientProvider client={queryClient}>

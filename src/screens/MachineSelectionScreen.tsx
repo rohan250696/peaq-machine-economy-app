@@ -5,7 +5,7 @@ import { MotiView } from 'moti'
 import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList, Machine } from '../types'
-import { MOCK_MACHINES } from '../constants'
+import { MOCK_MACHINES, GLASSMORPHISM } from '../constants'
 import * as Clipboard from 'expo-clipboard'
 import { useChainId, useBalance, useSwitchChain } from '../hooks/usePlatformWagmi'
 import { useAccount } from 'wagmi'
@@ -112,7 +112,7 @@ export default function MachineSelectionScreen() {
   const { machines: contractMachines, isLoading: machinesLoading, error: machinesError } = useAllMachines()
   
   // Machine Manager Context hooks
-  const { getMachine, getTokenBalance, getAllMachines } = useMachineManager()
+  const { getAllMachines } = useMachineManager()
   
   // Create dynamic styles based on theme - use useMemo to ensure they update when theme changes
   const dynamicStyles = React.useMemo(() => StyleSheet.create({
@@ -139,6 +139,32 @@ export default function MachineSelectionScreen() {
     },
     statLabel: {
       ...styles.statLabel,
+      color: colors.textSecondary,
+    },
+    sharesInfoSection: {
+      ...styles.sharesInfoSection,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    sharesInfoTitle: {
+      ...styles.sharesInfoTitle,
+      color: colors.text,
+    },
+    sharesInfoDescription: {
+      ...styles.sharesInfoDescription,
+      color: colors.textSecondary,
+    },
+    sharesInfoItem: {
+      ...styles.sharesInfoItem,
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+    },
+    sharesInfoItemTitle: {
+      ...styles.sharesInfoItemTitle,
+      color: colors.text,
+    },
+    sharesInfoItemText: {
+      ...styles.sharesInfoItemText,
       color: colors.textSecondary,
     },
   }), [colors])
@@ -176,16 +202,18 @@ export default function MachineSelectionScreen() {
     }
     
     return contractMachines.map((contractMachine, index) => ({
-      id: `machine-${index + 1}`, // Generate ID since contract doesn't provide it
+      id: `${index + 1}`, // Generate ID since contract doesn't provide it
       name: contractMachine.name,
       type: (contractMachine.name.toLowerCase().includes('cafe') ? 'RoboCafe' : 'Humanoid') as 'RoboCafe' | 'Humanoid',
-      image: `https://picsum.photos/300/200?random=${index + 1}`, // Placeholder image
+      image: contractMachine.name.toLowerCase().includes('cafe') 
+        ? 'coffee-robo-image.png' 
+        : 'humanoid.png', // Local images based on machine type
       address: contractMachine.machineOnChainAddr,
       revenue: parseFloat(contractMachine.lifetimeRevenue),
       totalRevenue: parseFloat(contractMachine.lifetimeRevenue),
       isActive: contractMachine.exists || false,
       location: {
-        name: 'Tokyo, Japan',
+        name: 'Cyberpunk City',
         lat: 35.6762,
         lng: 139.6503
       },
@@ -260,9 +288,7 @@ export default function MachineSelectionScreen() {
       if (!address || !isConnected) return
       
       setNetworkFetchStatus('Fetching from network...')
-      console.log('Fetching machines from network using getAllMachines...')
       const networkMachines = await getAllMachines()
-      console.log('Fetched machines from network:', networkMachines)
       
       setNetworkFetchStatus(`✅ Fetched ${networkMachines.length} machines from network`)
       
@@ -329,13 +355,6 @@ export default function MachineSelectionScreen() {
             <Text style={dynamicStyles.subtitle}>
               Select a machine to interact with and earn
             </Text>
-            
-            {/* Network Fetch Status */}
-            {networkFetchStatus && (
-              <View style={styles.networkStatusContainer}>
-                <Text style={styles.networkStatusText}>{networkFetchStatus}</Text>
-              </View>
-            )}
           </View>
         </View>
       </MotiView>
@@ -428,6 +447,33 @@ export default function MachineSelectionScreen() {
             </View>
           )}
 
+          {/* Ownership Shares Information Section */}
+          <View style={[styles.sharesInfoSection, dynamicStyles.sharesInfoSection]}>
+            <Text style={[styles.sharesInfoTitle, dynamicStyles.sharesInfoTitle]}>How Ownership Works</Text>
+            <Text style={[styles.sharesInfoDescription, dynamicStyles.sharesInfoDescription]}>
+              Every time you use a machine, you become a co-owner! You receive fractional shares that entitle you to a percentage of future earnings from that machine.
+            </Text>
+            <View style={styles.sharesInfoDetails}>
+              <View style={[styles.sharesInfoItem, dynamicStyles.sharesInfoItem]}>
+                <Text style={[styles.sharesInfoItemTitle, dynamicStyles.sharesInfoItemTitle]}>🎯 Fractional Ownership</Text>
+                <Text style={[styles.sharesInfoItemText, dynamicStyles.sharesInfoItemText]}>
+                  Each interaction gives you shares proportional to the machine's revenue sharing model
+                </Text>
+              </View>
+              <View style={[styles.sharesInfoItem, dynamicStyles.sharesInfoItem]}>
+                <Text style={[styles.sharesInfoItemTitle, dynamicStyles.sharesInfoItemTitle]}>💰 Passive Income</Text>
+                <Text style={[styles.sharesInfoItemText, dynamicStyles.sharesInfoItemText]}>
+                  Your shares earn you a percentage of all future revenue from the machine
+                </Text>
+              </View>
+              <View style={[styles.sharesInfoItem, dynamicStyles.sharesInfoItem]}>
+                <Text style={[styles.sharesInfoItemTitle, dynamicStyles.sharesInfoItemTitle]}>🔄 Compound Growth</Text>
+                <Text style={[styles.sharesInfoItemText, dynamicStyles.sharesInfoItemText]}>
+                  The more you use machines, the more you own, creating a growing passive income stream
+                </Text>
+              </View>
+            </View>
+          </View>
 
     </div>
   )
@@ -581,5 +627,54 @@ const styles = StyleSheet.create({
     color: '#A7A6A5',
     fontFamily: 'NB International Pro',
     textAlign: 'center',
+  },
+  sharesInfoSection: {
+    marginTop: spacing.xxl,
+    marginHorizontal: safeAreaPadding.horizontal,
+    padding: spacing.xl,
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.2)',
+    ...GLASSMORPHISM.shadow,
+  },
+  sharesInfoTitle: {
+    fontSize: responsive(fontSizes.xl, fontSizes.xxl, fontSizes.xxxl),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  sharesInfoDescription: {
+    fontSize: responsive(fontSizes.md, fontSizes.lg, fontSizes.xl),
+    color: '#E5E7EB',
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: spacing.xl,
+  },
+  sharesInfoDetails: {
+    gap: spacing.lg,
+  },
+  sharesInfoItem: {
+    padding: spacing.lg,
+    backgroundColor: 'rgba(31, 41, 55, 0.3)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.1)',
+  },
+  sharesInfoItemTitle: {
+    fontSize: responsive(fontSizes.lg, fontSizes.xl, fontSizes.xxl),
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: 'NB International Pro',
+    marginBottom: spacing.sm,
+  },
+  sharesInfoItemText: {
+    fontSize: responsive(fontSizes.md, fontSizes.lg, fontSizes.xl),
+    color: '#D1D5DB',
+    fontFamily: 'NB International Pro',
+    lineHeight: 22,
   },
 })

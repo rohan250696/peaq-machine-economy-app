@@ -5,14 +5,16 @@ import { MotiView } from 'moti'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList, Machine, PaymentFlowStep } from '../types'
-import { MACHINE_ACTIONS, GLASSMORPHISM, GRADIENTS } from '../constants'
+import { MACHINE_ACTIONS, GLASSMORPHISM, GRADIENTS, TOKEN_ADDRESS, PEAQ_MACHINE_MANAGER_ADDRESS } from '../constants'
 import * as Clipboard from 'expo-clipboard'
 import { safeTruncateHash } from '../utils/safeSlice'
 import { useTheme } from '../contexts/ThemeContext'
 import { useMachineManager } from '../contexts/MachineManagerContext'
 import { useAccount, useBalance } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
-import { usePrivy } from '@privy-io/react-auth'
+import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { ethers } from "ethers";
+import MachineManagerABI from '../abi/MachineManagerABI.json'
 
 const { width, height } = Dimensions.get('window')
 
@@ -47,11 +49,12 @@ export default function PaymentFlowScreen() {
   const [approveHash, setApproveHash] = useState<string>('')
   const [useMachineHash, setUseMachineHash] = useState<string>('')
   
-  const actionInfo = MACHINE_ACTIONS[machine.type]
+  const actionInfo = MACHINE_ACTIONS[machine.type] || MACHINE_ACTIONS.RoboCafe // Fallback to RoboCafe if type not found
   // Use real machine price from contract data if available, otherwise fallback to action price
   const price = machine.price ? machine.price : actionInfo.price
 
   const privy = usePrivy();
+  const { wallets } = useWallets();
 
   const paymentSteps: PaymentFlowStep[] = [
     {
@@ -98,23 +101,43 @@ export default function PaymentFlowScreen() {
         }
         
         // Step 1: Approve PEAQ tokens
-        console.log(`Approving ${price} PEAQ tokens for machine ${machine.id}`)
-        const provider = await privy.getAccessToken;
-        const approveHash = await approveToken(address, price.toString())
-        if (approveHash) {
-          setApproveHash(approveHash)
-          console.log('Approve transaction hash:', approveHash)
-        }
+        const wallet = wallets[0];
+        const ethereumProvider = await wallet.getEthereumProvider();
+        const provider = new ethers.BrowserProvider(ethereumProvider);
+        const signer = await provider.getSigner();
+        const erc20 = new ethers.Contract(
+          TOKEN_ADDRESS,
+          ["function approve(address spender, uint256 amount) returns (bool)"],
+          signer
+        );
+        const tx = await erc20.approve(
+          "0xA4963E5760a855AA39827FbB7691B47c2A34B755",
+          ethers.parseUnits(machine?.price?.toString() || "0", 18)
+        );
+        await tx.wait();
+        setApproveHash(tx?.hash);
         setCurrentStep(1)
         
         // Step 2: Use machine
         console.log(`Using machine ${machine.id}`)
-        const useMachineHash = await useMachine(machine.id)
-        if (useMachineHash) {
-          setUseMachineHash(useMachineHash)
-          setTransactionHash(useMachineHash) // Set the final transaction hash
-          console.log('Use machine transaction hash:', useMachineHash)
-        }
+
+        const machineManager = new ethers.Contract(
+          PEAQ_MACHINE_MANAGER_ADDRESS,
+          MachineManagerABI,
+          signer
+        );
+        const machineManagerTx = await machineManager.useMachine(machine.id);
+        await machineManagerTx.wait();
+        console.log('Use machine transaction hash:', machineManagerTx?.hash)
+        setUseMachineHash(machineManagerTx?.hash)
+        setTransactionHash(machineManagerTx?.hash)
+
+        // const useMachineHash = await useMachine(machine.id)
+        // if (useMachineHash) {
+        //   setUseMachineHash(useMachineHash)
+        //   setTransactionHash(useMachineHash) // Set the final transaction hash
+        //   console.log('Use machine transaction hash:', useMachineHash)
+        // }
         setCurrentStep(2)
         
         // Step 3: Success
@@ -391,6 +414,15 @@ export default function PaymentFlowScreen() {
                   <Text style={[styles.errorText, { color: '#EF4444' }]}>
                     ❌ {error}
                   </Text>
+                  
+                  {/* Back Button - Only show when there's an error */}
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.backButtonText}>← Go Back</Text>
+                  </TouchableOpacity>
                 </MotiView>
               )}
 
@@ -630,6 +662,21 @@ const styles = StyleSheet.create({
     fontFamily: 'NB International Pro',
     textAlign: 'center',
     fontWeight: '500',
+    marginBottom: 16,
+  },
+  backButton: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'NB International Pro',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   progressLine: {
     width: 2,

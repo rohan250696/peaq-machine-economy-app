@@ -1,16 +1,11 @@
-import React, { useState } from 'react'
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Alert, ScrollView } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+import React, { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Alert } from 'react-native'
 import { MotiView } from 'moti'
 import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { usePrivy, useLogin } from '../hooks/usePlatformAuth'
 import { RootStackParamList } from '../types'
-import { GLASSMORPHISM } from '../constants'
-import { scaleWidth, scaleHeight, spacing, fontSizes, safeAreaPadding, isSmallScreen, layout, responsive } from '../utils/responsive'
-import { createAccessibleButton, createAccessibleCard } from '../utils/accessibility'
-import SocialLoginButton from '../components/SocialLoginButton'
-import PeaqNetworkStatus from '../components/PeaqNetworkStatus'
+import { responsive } from '../utils/responsive'
 import { useTheme } from '../contexts/ThemeContext'
 
 const { width, height } = Dimensions.get('window')
@@ -25,21 +20,28 @@ export default function OnboardingScreen() {
   const [isLoading, setIsLoading] = useState(false)
 
   // Redirect if already authenticated
-  React.useEffect(() => {
+  useEffect(() => {
     if (ready && authenticated) {
       navigation.replace('MachineSelection')
     }
   }, [ready, authenticated, navigation])
 
-  const handleSocialLogin = async (provider: 'google' | 'apple' | 'twitter') => {
+  // Auto-trigger Privy modal on component mount
+  useEffect(() => {
+    if (ready && !authenticated) {
+      // Small delay to ensure component is fully mounted
+      const timer = setTimeout(() => {
+        handleLogin()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [ready, authenticated])
+
+  const handleLogin = async () => {
     setIsLoading(true)
     try {
-      console.log(`Logging in with ${provider}`)
-      
-      // Use Privy login with specific method
+      console.log('Opening Privy login modal')
       await login()
-      
-      // Navigation will be handled by the useEffect above
     } catch (error) {
       console.error('Login failed:', error)
       Alert.alert('Login Failed', 'Please try again')
@@ -47,7 +49,6 @@ export default function OnboardingScreen() {
       setIsLoading(false)
     }
   }
-
 
   // Create dynamic styles based on theme
   const dynamicStyles = React.useMemo(() => StyleSheet.create({
@@ -60,262 +61,144 @@ export default function OnboardingScreen() {
     subtitle: {
       color: colors.textSecondary,
     },
+    buttonText: {
+      color: colors.text,
+    },
   }), [colors])
 
   return (
-    <div style={{
-      height: '100vh',
-      backgroundColor: colors.background,
-      color: colors.text,
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch'
-    }}>
-      {/* Background Elements */}
+    <View style={[styles.container, dynamicStyles.container]}>
+      {/* Welcome Content */}
       <MotiView
-        from={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 0.1, scale: 1 }}
+        from={{ opacity: 0, translateY: 30 }}
+        animate={{ opacity: 1, translateY: 0 }}
         transition={{
-          type: 'timing',
-          duration: 3000,
-          loop: true,
+          type: 'spring',
+          damping: 15,
+          stiffness: 100,
         }}
-        style={styles.backgroundElement}
-      />
-
-        {/* Header */}
+        style={styles.content}
+      >
+        {/* Logo/Icon */}
         <MotiView
-          from={{ opacity: 0, translateY: -50 }}
-          animate={{ opacity: 1, translateY: 0 }}
+          from={{ scale: 0, rotate: '0deg' }}
+          animate={{ scale: 1, rotate: '360deg' }}
           transition={{
-            type: 'timing',
-            duration: 800,
+            type: 'spring',
+            damping: 10,
+            stiffness: 100,
+            delay: 200,
           }}
-          style={styles.header}
+          style={styles.logoContainer}
         >
-          <Text style={dynamicStyles.title}>Welcome to peaq</Text>
-          <Text style={dynamicStyles.subtitle}>
-            Connect your wallet to start earning from{'\n'}autonomous machines
+          <Text style={styles.logoEmoji}>🤖</Text>
+        </MotiView>
+
+        {/* Title */}
+        <Text style={[styles.title, dynamicStyles.title]}>Welcome to peaq</Text>
+        
+        {/* Subtitle */}
+        <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
+          Connect your wallet to start earning from{'\n'}autonomous machines
+        </Text>
+
+        {/* Login Button */}
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={handleLogin}
+          disabled={isLoading}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.loginButtonText, dynamicStyles.buttonText]}>
+            {isLoading ? 'Connecting...' : 'Get Started'}
           </Text>
-        </MotiView>
+        </TouchableOpacity>
 
-        {/* Social Login Options */}
-        <MotiView
-          from={{ opacity: 0, translateY: 30 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{
-            type: 'timing',
-            duration: 800,
-            delay: 300,
-          }}
-          style={styles.optionsContainer}
-        >
-          <View style={styles.socialOptions}>
-            <SocialLoginButton
-              provider="google"
-              onPress={() => handleSocialLogin('google')}
-              disabled={isLoading}
-            />
-            
-            <SocialLoginButton
-              provider="apple"
-              onPress={() => handleSocialLogin('apple')}
-              disabled={isLoading}
-            />
-            
-            <SocialLoginButton
-              provider="twitter"
-              onPress={() => handleSocialLogin('twitter')}
-              disabled={isLoading}
-            />
-          </View>
-          
-        </MotiView>
-
-        {/* Show network status after login */}
-        {authenticated && (
+        {/* Loading Indicator */}
+        {isLoading && (
           <MotiView
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{
-              type: 'timing',
-              duration: 600,
-              delay: 500,
-            }}
-            style={styles.networkStatusContainer}
+            from={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={styles.loadingContainer}
           >
-            <PeaqNetworkStatus 
-              showSwitchButton={true}
-            />
+            <Text style={[styles.loadingText, dynamicStyles.subtitle]}>
+              Opening login options...
+            </Text>
           </MotiView>
         )}
-
-        {/* Footer */}
-        <MotiView
-          from={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{
-            type: 'timing',
-            duration: 800,
-            delay: 900,
-          }}
-          style={styles.footer}
-        >
-          <Text style={styles.footerText}>
-            By continuing, you agree to our Terms of Service and Privacy Policy
-          </Text>
-          
-        </MotiView>
-    </div>
+      </MotiView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  backgroundElement: {
-    position: 'absolute',
-    width: width * 1.5,
-    height: height * 1.5,
-    backgroundColor: '#5252D7',
-    borderRadius: width * 0.75,
-    top: -height * 0.3,
-    right: -width * 0.3,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: safeAreaPadding.horizontal,
-    paddingTop: safeAreaPadding.top,
-    paddingBottom: safeAreaPadding.bottom + spacing.xl,
-  },
-  header: {
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    paddingHorizontal: responsive(20, 24, 32),
+  },
+  content: {
+    alignItems: 'center',
+    maxWidth: responsive(400, 500, 600),
+  },
+  logoContainer: {
+    width: responsive(80, 100, 120),
+    height: responsive(80, 100, 120),
+    borderRadius: responsive(40, 50, 60),
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: responsive(24, 32, 40),
+    borderWidth: 2,
+    borderColor: 'rgba(82, 82, 215, 0.3)',
+  },
+  logoEmoji: {
+    fontSize: responsive(40, 50, 60),
   },
   title: {
-    fontSize: responsive(fontSizes.largeTitle, fontSizes.huge),
+    fontSize: responsive(32, 40, 48),
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: spacing.md,
+    marginBottom: responsive(16, 20, 24),
     fontFamily: 'NB International Pro Bold',
-    lineHeight: responsive(fontSizes.largeTitle * 1.2, fontSizes.huge * 1.2),
+    color: '#FFFFFF',
   },
   subtitle: {
-    fontSize: responsive(fontSizes.lg, fontSizes.xl),
+    fontSize: responsive(16, 18, 20),
     textAlign: 'center',
-    lineHeight: responsive(fontSizes.lg * 1.5, fontSizes.xl * 1.5),
+    lineHeight: responsive(24, 28, 32),
     fontFamily: 'NB International Pro',
-    paddingHorizontal: spacing.sm,
-  },
-  tabContainer: {
-    marginBottom: spacing.xxl,
-  },
-  tabSelector: {
-    flexDirection: 'row',
-    backgroundColor: GLASSMORPHISM.card.background,
-    borderRadius: layout.cardRadius,
-    padding: spacing.xs,
-    borderWidth: 1,
-    borderColor: GLASSMORPHISM.card.border,
-    ...GLASSMORPHISM.card.shadow,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: layout.cardRadius - 4,
-    alignItems: 'center',
-    minHeight: layout.buttonHeightSmall,
-    justifyContent: 'center',
-  },
-  activeTab: {
-    backgroundColor: '#5252D7',
-  },
-  tabText: {
-    fontSize: responsive(fontSizes.md, fontSizes.lg),
+    marginBottom: responsive(32, 40, 48),
     color: '#A7A6A5',
-    fontFamily: 'NB International Pro',
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  optionsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: spacing.lg,
-  },
-  socialOptions: {
-    gap: spacing.md,
-  },
-  networkStatusContainer: {
-    marginTop: spacing.lg,
-  },
-  walletOptions: {
-    alignItems: 'center',
-    gap: spacing.lg,
   },
   loginButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: layout.cardRadius,
-    backgroundColor: GLASSMORPHISM.button.background,
-    borderWidth: 1,
-    borderColor: GLASSMORPHISM.button.border,
-    minHeight: layout.buttonHeight,
-    ...GLASSMORPHISM.button.shadow,
+    backgroundColor: '#5252D7',
+    paddingVertical: responsive(16, 20, 24),
+    paddingHorizontal: responsive(32, 40, 48),
+    borderRadius: responsive(16, 20, 24),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  googleButton: {
-    backgroundColor: 'rgba(66, 133, 244, 0.1)',
-    borderColor: 'rgba(66, 133, 244, 0.3)',
-  },
-  appleButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  twitterButton: {
-    backgroundColor: 'rgba(29, 161, 242, 0.1)',
-    borderColor: 'rgba(29, 161, 242, 0.3)',
-  },
-  walletButton: {
-    backgroundColor: 'rgba(82, 82, 215, 0.1)',
-    borderColor: 'rgba(82, 82, 215, 0.3)',
-    minWidth: responsive(200, 240),
-  },
-  buttonEmoji: {
-    fontSize: responsive(20, 24),
-    marginRight: spacing.md,
-  },
-  buttonText: {
-    fontSize: responsive(fontSizes.lg, fontSizes.xl),
+  loginButtonText: {
+    fontSize: responsive(16, 18, 20),
+    fontWeight: 'bold',
+    fontFamily: 'NB International Pro Bold',
     color: '#FFFFFF',
-    fontWeight: '600',
-    fontFamily: 'NB International Pro',
   },
-  walletDescription: {
-    fontSize: responsive(fontSizes.md, fontSizes.lg),
-    color: '#A7A6A5',
-    textAlign: 'center',
-    lineHeight: responsive(fontSizes.md * 1.4, fontSizes.lg * 1.4),
-    fontFamily: 'NB International Pro',
-    paddingHorizontal: spacing.md,
-  },
-  footer: {
+  loadingContainer: {
+    marginTop: responsive(16, 20, 24),
     alignItems: 'center',
-    paddingTop: spacing.lg,
   },
-  footerText: {
-    fontSize: responsive(fontSizes.sm, fontSizes.md),
-    color: '#747372',
-    textAlign: 'center',
-    lineHeight: responsive(fontSizes.sm * 1.3, fontSizes.md * 1.3),
+  loadingText: {
+    fontSize: responsive(14, 16, 18),
     fontFamily: 'NB International Pro',
-    paddingHorizontal: spacing.md,
+    color: '#A7A6A5',
   },
 })

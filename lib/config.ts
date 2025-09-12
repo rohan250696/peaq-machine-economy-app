@@ -15,7 +15,7 @@ export const peaqChain = {
 
 // Wagmi config (shared)
 export const wagmiConfig = createConfig({
-  chains: [peaqChain, agungTestnet],
-  transports: { [peaqChain.id]: http(peaqChain.rpcUrls.default.http[0]), 
+  chains: [peaq, agungTestnet],
+  transports: { [peaq.id]: http(peaq.rpcUrls.default.http[0]), 
     [agungTestnet.id]: http(agungTestnet.rpcUrls.default.http[0]) }
 });

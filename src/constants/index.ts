@@ -6,7 +6,7 @@ export const MOCK_MACHINES: Machine[] = [
     id: 'robo-cafe-001',
     name: 'RoboCafe',
     type: 'RoboCafe',
-    image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=300&fit=crop',
+    image: 'coffee-robo-image.png',
     address: '',
     revenue: 0.00,
     totalRevenue: 0,
@@ -21,7 +21,7 @@ export const MOCK_MACHINES: Machine[] = [
     id: 'humanoid-001',
     name: 'Humanoid Dispenser',
     type: 'Humanoid',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&h=300&fit=crop',
+    image: 'humanoid.png',
     address: '',
     revenue: 0,
     totalRevenue: 0,
@@ -109,6 +109,6 @@ export const MACHINE_ACTIONS = {
 export const AGUNG_TESTNET_MACHINE_MANAGER_ADDRESS = 
 '0xed043CE0D946706c532C8E346E96143088183E90';
 export const PEAQ_MACHINE_MANAGER_ADDRESS = 
-'0x0000000000000000000000000000000000000000';
+'0xA4963E5760a855AA39827FbB7691B47c2A34B755';
 
 export const TOKEN_ADDRESS = '0x0000000000000000000000000000000000000809';

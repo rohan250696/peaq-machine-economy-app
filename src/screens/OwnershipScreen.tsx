@@ -8,6 +8,13 @@ import { RootStackParamList, Machine, Ownership } from '../types'
 import { GRADIENTS, GLASSMORPHISM } from '../constants'
 import { responsive } from '../utils/responsive'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAccount } from 'wagmi'
+import { 
+  useOwnershipBps, 
+  useClaimableFor, 
+  useMachineInfo, 
+  useUserShareBalance 
+} from '../contexts/MachineManagerContext'
 
 const { width, height } = Dimensions.get('window')
 
@@ -19,6 +26,22 @@ export default function OwnershipScreen() {
   const route = useRoute<OwnershipScreenRouteProp>()
   const { machine, ownership } = route.params
   const { colors } = useTheme()
+  const { address } = useAccount()
+  
+  // Get real-time ownership data from contract
+  const { ownershipBps, isLoading: ownershipLoading } = useOwnershipBps(machine.id, address || '')
+  const { claimableAmount, isLoading: claimableLoading } = useClaimableFor(machine.id, address || '')
+  const { machineInfo, isLoading: machineInfoLoading } = useMachineInfo(machine.id)
+  const { shareBalance, isLoading: shareBalanceLoading } = useUserShareBalance(machine.id, address || '')
+  
+  // Calculate ownership data
+  const ownershipPercentage = ownershipBps ? (Number(ownershipBps) / 100).toFixed(2) : '0.00'
+  const userShareOfLifetimeRevenue = machineInfo?.lifetimeRevenue 
+    ? (parseFloat(machineInfo.lifetimeRevenue) * Number(ownershipBps || 0) / 10000).toFixed(4)
+    : '0.0000'
+  const userShareOfUnallocatedRevenue = machineInfo?.unallocatedRevenue
+    ? (parseFloat(machineInfo.unallocatedRevenue) * Number(ownershipBps || 0) / 10000).toFixed(4)
+    : '0.0000'
   
   const [showConfetti, setShowConfetti] = useState(true)
   const [animatedPercentage, setAnimatedPercentage] = useState(0)
@@ -49,10 +72,6 @@ export default function OwnershipScreen() {
     
     setTimeout(animatePercentage, 500)
   }, [ownership.percentage])
-
-  const handleViewDashboard = () => {
-    navigation.replace('Dashboard')
-  }
 
   const handleBackToMachines = () => {
     navigation.navigate('MachineSelection')
@@ -197,7 +216,15 @@ export default function OwnershipScreen() {
             <View style={[styles.cardGradient, dynamicStyles.cardBackground]}>
               {/* Machine Image */}
               <View style={styles.machineImageContainer}>
-                <Image source={{ uri: machine.image }} style={styles.machineImage} />
+                <Image 
+                  source={
+                    machine.image?.includes('coffee-robo-image.png') || machine.type === 'RoboCafe'
+                      ? require('../../assets/coffee-robo-image.png')
+                      : require('../../assets/humanoid.png')
+                  }
+                  style={styles.machineImage}
+                  resizeMode="cover"
+                />
                 <View style={styles.ownershipBadge}>
                   <Text style={styles.ownershipBadgeText}>OWNED</Text>
                 </View>
@@ -208,28 +235,85 @@ export default function OwnershipScreen() {
                 <Text style={[styles.machineName, dynamicStyles.machineName]}>{machine.name}</Text>
                 <Text style={[styles.machineType, dynamicStyles.cardSubtitle]}>{machine.type}</Text>
                 
-                {/* Percentage Display */}
+                {/* Ownership Percentage */}
                 <View style={styles.percentageContainer}>
-                  <Text style={[styles.percentageLabel, dynamicStyles.statsLabel]}>Ownership</Text>
+                  <Text style={[styles.percentageLabel, dynamicStyles.statsLabel]}>Ownership %</Text>
                   <Text style={[styles.percentageValue, dynamicStyles.percentageText]}>
-                    {animatedPercentage.toFixed(1)}%
+                    {ownershipLoading ? 'Loading...' : `${ownershipPercentage}%`}
                   </Text>
                 </View>
 
-                {/* Earnings Display */}
+                {/* Current Claimable Rewards */}
                 <View style={styles.earningsContainer}>
-                  <Text style={[styles.earningsLabel, dynamicStyles.statsLabel]}>Total Earnings</Text>
-                  <Text style={[styles.earningsValue, dynamicStyles.earningsText]}>
-                    {ownership.earnings.toFixed(4)} PEAQ
+                  <Text style={[styles.earningsLabel, dynamicStyles.statsLabel]}>Current Rewards (Claimable)</Text>
+                  <View style={styles.tokenValueContainer}>
+                    <Text style={[styles.earningsValue, dynamicStyles.earningsText]}>
+                      {claimableLoading ? 'Loading...' : `${parseFloat(claimableAmount || '0').toFixed(4)}`}
+                    </Text>
+                    <Image source={require('../../assets/peaq-logo.svg')} style={styles.tokenLogo} />
+                  </View>
+                </View>
+
+                {/* Fractional Shares Owned */}
+                <View style={styles.tokensContainer}>
+                  <Text style={[styles.tokensLabel, dynamicStyles.statsLabel]}>Fractional Shares Owned</Text>
+                  <Text style={[styles.tokensValue, dynamicStyles.statsValue]}>
+                    {shareBalanceLoading ? 'Loading...' : `${parseInt(shareBalance || '0').toLocaleString()}`}
                   </Text>
                 </View>
 
-                {/* Tokens Display */}
-                <View style={styles.tokensContainer}>
-                  <Text style={[styles.tokensLabel, dynamicStyles.statsLabel]}>Tokens Owned</Text>
-                  <Text style={[styles.tokensValue, dynamicStyles.statsValue]}>
-                    {ownership.tokens.toLocaleString()} / {ownership.totalTokens.toLocaleString()}
-                  </Text>
+                {/* Your Share of Lifetime Revenue */}
+                <View style={styles.revenueContainer}>
+                  <Text style={[styles.revenueLabel, dynamicStyles.statsLabel]}>Your Share of Lifetime Revenue</Text>
+                  <View style={styles.tokenValueContainer}>
+                    <Text style={[styles.revenueValue, dynamicStyles.earningsText]}>
+                      {machineInfoLoading ? 'Loading...' : `${userShareOfLifetimeRevenue}`}
+                    </Text>
+                    <Image source={require('../../assets/peaq-logo.svg')} style={styles.tokenLogo} />
+                  </View>
+                </View>
+
+                {/* Machine Revenue Stats */}
+                <View style={styles.machineStatsContainer}>
+                  <Text style={[styles.statsTitle, dynamicStyles.statsLabel]}>Machine Revenue Stats</Text>
+                  
+                  <View style={styles.statRow}>
+                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Total Lifetime Revenue:</Text>
+                    <View style={styles.statValueContainer}>
+                      <Text style={[styles.statValue, dynamicStyles.statsValue]}>
+                        {machineInfoLoading ? 'Loading...' : `${parseFloat(machineInfo?.lifetimeRevenue || '0').toFixed(4)}`}
+                      </Text>
+                      <Image source={require('../../assets/peaq-logo.svg')} style={styles.statTokenLogo} />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.statRow}>
+                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Unallocated Revenue:</Text>
+                    <View style={styles.statValueContainer}>
+                      <Text style={[styles.statValue, dynamicStyles.statsValue]}>
+                        {machineInfoLoading ? 'Loading...' : `${parseFloat(machineInfo?.unallocatedRevenue || '0').toFixed(4)}`}
+                      </Text>
+                      <Image source={require('../../assets/peaq-logo.svg')} style={styles.statTokenLogo} />
+                    </View>
+                  </View>
+                  
+                  <View style={styles.statRow}>
+                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Your Share of Unallocated:</Text>
+                    <View style={styles.statValueContainer}>
+                      <Text style={[styles.statValue, dynamicStyles.statsValue]}>
+                        {machineInfoLoading ? 'Loading...' : `${userShareOfUnallocatedRevenue}`}
+                      </Text>
+                      <Image source={require('../../assets/peaq-logo.svg')} style={styles.statTokenLogo} />
+                    </View>
+                  </View>
+                  
+                  
+                  <View style={styles.statRow}>
+                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Total Shares:</Text>
+                    <Text style={[styles.statValue, dynamicStyles.statsValue]}>
+                      {machineInfoLoading ? 'Loading...' : `${parseInt(machineInfo?.totalShares || '0').toLocaleString()}`}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -248,21 +332,6 @@ export default function OwnershipScreen() {
             style={styles.actionsContainer}
           >
             <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleViewDashboard}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={GRADIENTS.primary as [string, string]}
-                style={styles.buttonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={[styles.primaryButtonText, dynamicStyles.buttonText]}>View Dashboard</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={styles.secondaryButton}
               onPress={handleBackToMachines}
               activeOpacity={0.8}
@@ -272,14 +341,14 @@ export default function OwnershipScreen() {
           </MotiView>
 
           {/* Extra content to ensure scrolling */}
-          <View style={styles.extraContent}>
+          {/* <View style={styles.extraContent}>
             <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🎉 Congratulations on your first machine ownership!</Text>
             <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>💰 Start earning passive income from autonomous machines</Text>
             <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>📈 Track your earnings in the dashboard</Text>
             <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🔄 Explore more machines to diversify your portfolio</Text>
             <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🚀 Join the machine economy revolution!</Text>
             <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>💎 Your fractional ownership is now live</Text>
-          </View>
+          </View> */}
     </div>
   )
 }
@@ -375,8 +444,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   machineImage: {
-    width: 120,
-    height: 120,
+    width: responsive(100, 120, 140),
+    height: responsive(100, 120, 140),
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -516,5 +585,80 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'NB International Pro',
     lineHeight: 20,
+  },
+  revenueContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  revenueLabel: {
+    fontSize: 14,
+    color: '#A7A6A5',
+    marginBottom: 8,
+    fontFamily: 'NB International Pro',
+  },
+  revenueValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: 'NB International Pro Bold',
+  },
+  machineStatsContainer: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  statsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    textAlign: 'center',
+    fontFamily: 'NB International Pro Bold',
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#A7A6A5',
+    fontFamily: 'NB International Pro',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: 'NB International Pro Bold',
+    textAlign: 'right',
+    flex: 1,
+  },
+  tokenValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  tokenLogo: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  statValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    flex: 1,
+  },
+  statTokenLogo: {
+    width: 16,
+    height: 16,
+    resizeMode: 'contain',
   },
 })
