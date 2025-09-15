@@ -29,7 +29,7 @@ export default function WebProviders({ children }: WebProvidersProps) {
     <PrivyProvider
       appId="cmfbnnxj1002qjv0bvwv55syr"
       config={{
-        loginMethods: ["google", "twitter", "apple"],
+        loginMethods: ["google", "twitter"],
         embeddedWallets: { createOnLogin: "users-without-wallets" },
         defaultChain: agungTestnet,
         supportedChains: [peaq, agungTestnet],
