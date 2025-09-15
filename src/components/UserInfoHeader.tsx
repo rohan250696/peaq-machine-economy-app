@@ -9,6 +9,7 @@ import { spacing, fontSizes, responsive } from './ResponsiveLayout'
 import { useTheme } from '../contexts/ThemeContext'
 import { useProfitTokenBalance } from '../contexts/MachineManagerContext'
 import { formatEther } from 'viem'
+import PeaqSharingTokenIcon from './PeaqSharingTokenIcon'
 
 export default function UserInfoHeader() {
   const { authenticated, user: privyUser } = usePrivy()
@@ -322,7 +323,7 @@ export default function UserInfoHeader() {
                 {/* Profit Sharing Token Balance */}
                 <View style={styles.balanceInfo}>
                   <View style={styles.balanceLogoContainer}>
-                    <Text style={styles.tokenIcon}>💰</Text>
+                    <PeaqSharingTokenIcon size={responsive(32, 36, 40)} />
                   </View>
                   <View style={styles.balanceDetails}>
                     <Text style={styles.balanceLabel}>peaqPFT</Text>
@@ -481,7 +482,7 @@ export default function UserInfoHeader() {
                 {/* Profit Sharing Token Balance */}
                 <View style={styles.balanceInfo}>
                   <View style={styles.balanceLogoContainer}>
-                    <Text style={styles.tokenIcon}>💰</Text>
+                    <PeaqSharingTokenIcon size={responsive(32, 36, 40)} />
                   </View>
                   <View style={styles.balanceDetails}>
                     <Text style={styles.balanceLabel}>peaqPFT</Text>

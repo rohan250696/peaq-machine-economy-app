@@ -10,6 +10,7 @@ import { responsive } from '../utils/responsive'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAccount } from 'wagmi'
 import { useMachineInfo, useProfitTokenBalance } from '../contexts/MachineManagerContext'
+import PeaqSharingTokenIcon from '../components/PeaqSharingTokenIcon'
 
 const { width, height } = Dimensions.get('window')
 
@@ -222,7 +223,7 @@ export default function OwnershipScreen() {
             
             <View style={styles.tokenBalanceDisplay}>
               <View style={styles.tokenIconContainer}>
-                <Text style={styles.tokenIcon}>🪙</Text>
+                <PeaqSharingTokenIcon size={responsive(32, 40, 48)} />
               </View>
               <View style={styles.tokenBalanceInfo}>
                 <Text style={[styles.tokenBalanceValue, dynamicStyles.successText]}>

@@ -1,39 +1,45 @@
 # peaq Machine Economy App
 
-A React Native (Expo) application that showcases peaq's machine economy vision, allowing users to interact with autonomous machines, earn fractional ownership, and receive profit sharing.
+A React Native (Expo) application that showcases peaq's machine economy vision, allowing users to interact with autonomous machines, earn profit-sharing tokens, and participate in the decentralized machine economy.
 
 ## Features
 
 ### 🚀 Core Functionality
-- **QR Entry**: Scan QR codes to access the PWA or mobile app
+
 - **Social Authentication**: Login with Google, Apple, Twitter via Privy
 - **Wallet Connect**: Connect existing wallets for blockchain interactions
-- **Machine Selection**: Browse available machines (RoboCafe, Humanoid)
-- **Machine Interactions**: Execute actions like getting coffee or t-shirts
-- **Payment Flow**: Pay with PEAQ tokens with real-time transaction status
-- **Ownership Tokens**: Receive fractional RWA ownership as NFTs
-- **Profit Sharing Dashboard**: Track earnings and machine performance
+- **Machine Selection**: Browse available machines (RoboCafe, Humanoid) with real-time data
+- **Smart Contract Integration**: Direct interaction with MachineManager contract
+- **Payment Flow**: Pay with PEAQ tokens with automatic airdrop for new users
+- **Profit Sharing Tokens**: Receive peaqPFT tokens representing machine ownership
+- **Real-time Balance Tracking**: Monitor PEAQ and peaqPFT token balances
+- **Transaction History**: View all transaction hashes and status
 
 ### 🎨 Design System
-- **Dark Theme**: Premium dark mode with purple-to-teal gradients
+
+- **Light/Dark Theme**: Dynamic theme switching with peaq brand colors
 - **Glassmorphism**: Semi-transparent cards with blur effects
 - **Modern Animations**: Smooth transitions using Moti and Reanimated
-- **Responsive Design**: Works seamlessly on mobile and web
+- **Responsive Design**: Works seamlessly on mobile, tablet, and desktop
 - **Material 3**: Built with modern design principles
+- **Custom Icons**: PeaqSharingTokenIcon for consistent branding
 
 ### 🔧 Tech Stack
+
 - **Framework**: Expo (React Native + Web/PWA support)
-- **UI System**: Tamagui for unified design system
-- **Animations**: Moti, React Native Reanimated, Lottie
+- **UI System**: Material 3 + GetWidget components
+- **Animations**: Moti, React Native Reanimated, Rive for animated SVGs
 - **Navigation**: React Navigation v7
 - **Authentication**: Privy SDK
-- **Charts**: Recharts (web) + React Native SVG Charts (mobile)
-- **Styling**: NativeWind for Tailwind-like utilities
+- **Blockchain**: Wagmi v2 for Ethereum/EVM interactions
+- **Smart Contracts**: Viem for contract interactions
+- **Styling**: Custom responsive utilities with 'Nb International Pro' font
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+
+- Node.js 18+
 - npm or yarn
 - Expo CLI
 - iOS Simulator (for iOS development)
@@ -42,29 +48,33 @@ A React Native (Expo) application that showcases peaq's machine economy vision, 
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd peaq-machine-economy-app
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Start the development server**
+
    ```bash
    npm start
    ```
 
 4. **Run on specific platforms**
+
    ```bash
    # iOS
    npm run ios
-   
+
    # Android
    npm run android
-   
+
    # Web
    npm run web
    ```
@@ -77,11 +87,21 @@ src/
 │   ├── SplashScreen.tsx
 │   ├── OnboardingScreen.tsx
 │   ├── MachineSelectionScreen.tsx
-│   ├── ActionScreen.tsx
 │   ├── PaymentFlowScreen.tsx
 │   ├── OwnershipScreen.tsx
 │   └── DashboardScreen.tsx
 ├── components/        # Reusable UI components
+│   ├── PeaqSharingTokenIcon.tsx
+│   ├── UserInfoHeader.tsx
+│   ├── MachineCard.tsx
+│   └── ResponsiveContainer.tsx
+├── contexts/         # React contexts
+│   ├── MachineManagerContext.tsx
+│   └── ThemeContext.tsx
+├── abi/              # Smart contract ABIs
+│   ├── MachineManagerABI.json
+│   ├── ERC20.json
+│   └── ProfitSharingToken.json
 ├── types/            # TypeScript type definitions
 ├── constants/        # App constants and mock data
 └── utils/           # Utility functions
@@ -90,35 +110,39 @@ src/
 ## Key Screens
 
 ### 1. Splash Screen
+
 - Animated peaq logo with gradient background
 - Smooth transitions to onboarding
 
 ### 2. Onboarding
+
 - Social login options (Google, Apple, Twitter)
-- Wallet Connect integration
-- Glassmorphism design with tab selection
+- Direct Privy login modal integration
+- Modern responsive UI with real social media logos
 
 ### 3. Machine Selection
-- Grid of available machines with live revenue updates
-- Glassmorphism cards with machine details
-- Pull-to-refresh functionality
 
-### 4. Action Screen
-- Machine details and available actions
-- Animated action buttons with emoji CTAs
-- Benefits explanation
+- Grid of available machines with real-time contract data
+- Network statistics (total machines, revenue, chain ID)
+- Profit Sharing Token balance display
+- Responsive container for desktop/laptop centering
 
-### 5. Payment Flow
-- Real-time transaction status modal
-- Step-by-step payment process
-- Transaction hash display with explorer link
+### 4. Payment Flow
 
-### 6. Ownership Screen
-- Confetti animation on success
-- NFT/RWA ownership display
-- Animated percentage counter
+- Automatic PEAQ token airdrop for new users
+- Smart contract interaction with MachineManager
+- Real-time transaction status with hashes
+- Navigation to ownership details
 
-### 7. Dashboard
+### 5. Ownership Screen
+
+- Modern responsive UI design
+- peaqPFT token balance display with branded icon
+- Machine overview and statistics
+- Back navigation to machine selection
+
+### 6. Dashboard
+
 - Portfolio overview with animated balance
 - Earnings charts and statistics
 - Machine ownership list with live updates
@@ -126,6 +150,7 @@ src/
 ## Configuration
 
 ### Environment Variables
+
 Create a `.env` file in the root directory:
 
 ```env
@@ -135,45 +160,95 @@ PRIVY_APP_SECRET=your_privy_app_secret
 
 # Blockchain Configuration
 PEAQ_RPC_URL=your_peaq_rpc_url
-PEAQ_CHAIN_ID=your_chain_id
+PEAQ_CHAIN_ID=3338  # or 9990 (both supported)
 
-# Email Service (Optional)
-SENDGRID_API_KEY=your_sendgrid_key
+# Smart Contract Addresses
+MACHINE_MANAGER_ADDRESS=0x6B199Bf7b3bFB7687485E0972228415B4Aa3408c
+PROFIT_SHARING_TOKEN_ADDRESS=0x...
+
+# Airdrop Configuration
+AIRDROP_PRIVATE_KEY=your_airdrop_private_key
+GAS_FEE_ESTIMATE=0.001
 ```
 
-### Tamagui Configuration
-The design system is configured in `tamagui.config.ts` with:
-- Custom dark theme with peaq brand colors
-- Glassmorphism utilities
-- Gradient definitions
-- Typography scale using Inter font
+### Smart Contract Integration
+
+The app integrates with:
+
+- **MachineManager Contract**: Handles machine interactions and payments
+- **ProfitSharingToken Contract**: Manages peaqPFT token distribution
+- **ERC20 PEAQ Token**: For payments and airdrops
+- **Multi-chain Support**: Supports chain IDs 3338 and 9990
 
 ## Development
 
-### Adding New Machines
-1. Update `MOCK_MACHINES` in `src/constants/index.ts`
-2. Add machine type to `MACHINE_ACTIONS` if needed
-3. Update types in `src/types/index.ts`
+### Smart Contract Integration
+
+1. Update contract addresses in `src/contexts/MachineManagerContext.tsx`
+2. Modify ABI files in `src/abi/` directory
+3. Update TypeScript types in `src/types/MachineManagerTypes.ts`
+
+### Adding New Components
+
+1. Create components in `src/components/` directory
+2. Use `ResponsiveContainer` for desktop/laptop centering
+3. Follow the theme system with `useTheme` hook
+4. Use `PeaqSharingTokenIcon` for consistent branding
 
 ### Customizing Animations
+
 - Use Moti for simple animations
 - React Native Reanimated for complex gestures
-- Lottie for advanced animations
+- Rive for animated SVGs
 
 ### Styling Guidelines
-- Use Tamagui components for consistency
+
+- Use Material 3 + GetWidget components
 - Apply glassmorphism with `GLASSMORPHISM` constants
 - Use gradient backgrounds with `GRADIENTS` constants
-- Follow the dark theme color palette
+- Follow the dynamic theme system (light/dark)
+- Use 'Nb International Pro' font family
+- Implement responsive design with custom utilities
+
+## Current Features
+
+### 🔗 Smart Contract Integration
+
+- **MachineManager Contract**: Direct interaction with deployed contract
+- **Real-time Data**: Live machine data, balances, and transaction status
+- **Multi-chain Support**: Works with Peaq network (chain IDs 3338 and 9990)
+- **Airdrop System**: Automatic PEAQ token distribution for new users
+
+### 💰 Token Management
+
+- **PEAQ Token**: Native and ERC20 token support
+- **peaqPFT Tokens**: Profit-sharing tokens with branded icons
+- **Balance Tracking**: Real-time balance updates across all token types
+- **Transaction History**: Complete transaction hash tracking
+
+### 🎨 UI/UX Features
+
+- **Responsive Design**: Mobile, tablet, and desktop optimization
+- **Theme System**: Dynamic light/dark theme switching
+- **Branded Icons**: Consistent peaq logo usage throughout
+- **Modern Animations**: Smooth transitions and micro-interactions
+
+### 🔐 Authentication & Security
+
+- **Privy Integration**: Social login with Google, Apple, Twitter
+- **Wallet Connect**: Support for existing wallet connections
+- **Secure Transactions**: Proper error handling and validation
 
 ## Building for Production
 
 ### Web (PWA)
+
 ```bash
 npx expo export:web
 ```
 
 ### Mobile Apps
+
 ```bash
 # Build for iOS
 npx eas build --platform ios
@@ -197,6 +272,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 For support and questions:
+
 - Create an issue in the repository
 - Join the peaq community Discord
 - Check the documentation at docs.peaq.network

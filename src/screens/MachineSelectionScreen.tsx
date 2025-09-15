@@ -14,7 +14,7 @@ import { safeTruncateAddress } from '../utils/safeSlice'
 import MachineCard from '../components/MachineCard'
 import { useCopyFeedback } from '../components/GlobalUserInfo'
 import { useTheme } from '../contexts/ThemeContext'
-import ProfitTokenIcon from '../components/ProfitTokenIcon'
+import PeaqSharingTokenIcon from '../components/PeaqSharingTokenIcon'
 import { 
   useTokenBalance, 
   useMachineCount,
@@ -405,7 +405,7 @@ export default function MachineSelectionScreen() {
           style={[styles.profitTokenCard, dynamicStyles.profitTokenCard]}
         >
           <View style={styles.profitTokenHeader}>
-            <ProfitTokenIcon size={24} />
+            <PeaqSharingTokenIcon size={24} />
             <View style={styles.profitTokenInfo}>
               <Text style={[styles.profitTokenName, dynamicStyles.profitTokenName]}>
                 {profitInfoLoading ? 'Loading...' : (profitTokenName || 'Profit Token')}
