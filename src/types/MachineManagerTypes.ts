@@ -4,16 +4,11 @@
 
 export interface MachineInfo {
   name: string;
-  machineOnChainAddr: string;
+  machineAddr: string;  // Renamed from machineOnChainAddr
   price: string;
   platformFeeBps: number;
-  revenueShareBps: number;
-  sharesPerPurchase: string;
-  totalShares: string;
-  lifetimeRevenue: string;
-  unallocatedRevenue: string;
-  rewardPerShare?: string;
-  exists?: boolean;
+  exists: boolean;  // Added back from contract
+  // Removed: revenueShareBps, sharesPerPurchase, totalShares, lifetimeRevenue, unallocatedRevenue, rewardPerShare
 }
 
 // Return type for getAllMachines function
@@ -155,11 +150,6 @@ export interface GetMachineReturn {
   machineAddr: string;
   price: string;
   platformFeeBps: number;
-  revenueShareBps: number;
-  sharesPerPurchase: string;
-  totalShares: string;
-  lifetimeRevenue: string;
-  unallocatedRevenue: string;
 }
 
 export interface ClaimableForReturn {

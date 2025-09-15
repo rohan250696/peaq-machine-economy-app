@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ScrollView, SafeAreaView } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MotiView } from 'moti'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
-import { RootStackParamList, Machine, Ownership } from '../types'
+import { RootStackParamList, Machine } from '../types'
 import { GRADIENTS, GLASSMORPHISM } from '../constants'
 import { responsive } from '../utils/responsive'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAccount } from 'wagmi'
-import { 
-  useOwnershipBps, 
-  useClaimableFor, 
-  useMachineInfo, 
-  useUserShareBalance 
-} from '../contexts/MachineManagerContext'
+import { useMachineInfo, useProfitTokenBalance } from '../contexts/MachineManagerContext'
 
 const { width, height } = Dimensions.get('window')
 
@@ -24,24 +19,15 @@ type OwnershipScreenRouteProp = RouteProp<RootStackParamList, 'Ownership'>
 export default function OwnershipScreen() {
   const navigation = useNavigation<OwnershipScreenNavigationProp>()
   const route = useRoute<OwnershipScreenRouteProp>()
-  const { machine, ownership } = route.params
+  const { machine } = route.params
   const { colors } = useTheme()
   const { address } = useAccount()
   
-  // Get real-time ownership data from contract
-  const { ownershipBps, isLoading: ownershipLoading } = useOwnershipBps(machine.id, address || '')
-  const { claimableAmount, isLoading: claimableLoading } = useClaimableFor(machine.id, address || '')
+  // Get real-time machine data from contract
   const { machineInfo, isLoading: machineInfoLoading } = useMachineInfo(machine.id)
-  const { shareBalance, isLoading: shareBalanceLoading } = useUserShareBalance(machine.id, address || '')
   
-  // Calculate ownership data
-  const ownershipPercentage = ownershipBps ? (Number(ownershipBps) / 100).toFixed(2) : '0.00'
-  const userShareOfLifetimeRevenue = machineInfo?.lifetimeRevenue 
-    ? (parseFloat(machineInfo.lifetimeRevenue) * Number(ownershipBps || 0) / 10000).toFixed(4)
-    : '0.0000'
-  const userShareOfUnallocatedRevenue = machineInfo?.unallocatedRevenue
-    ? (parseFloat(machineInfo.unallocatedRevenue) * Number(ownershipBps || 0) / 10000).toFixed(4)
-    : '0.0000'
+  // Get peaqPFT token balance
+  const { balance: peaqPFTBalance, isLoading: peaqPFTBalanceLoading } = useProfitTokenBalance(address || '')
   
   const [showConfetti, setShowConfetti] = useState(true)
   const [animatedPercentage, setAnimatedPercentage] = useState(0)
@@ -51,27 +37,17 @@ export default function OwnershipScreen() {
     const timer = setTimeout(() => {
       setShowConfetti(false)
     }, 3000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
-    // Animate percentage counter
-    const animatePercentage = () => {
-      let current = 0
-      const increment = ownership.percentage / 30
-      const timer = setInterval(() => {
-        current += increment
-        if (current >= ownership.percentage) {
-          current = ownership.percentage
-          clearInterval(timer)
-        }
-        setAnimatedPercentage(current)
-      }, 30)
-    }
     
-    setTimeout(animatePercentage, 500)
-  }, [ownership.percentage])
+    // Animate percentage
+    const animateTimer = setTimeout(() => {
+      setAnimatedPercentage(100)
+    }, 500)
+    
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(animateTimer)
+    }
+  }, [])
 
   const handleBackToMachines = () => {
     navigation.navigate('MachineSelection')
@@ -88,36 +64,34 @@ export default function OwnershipScreen() {
     subtitle: {
       color: colors.textSecondary,
     },
-    cardBackground: {
-      backgroundColor: colors.surface,
+    card: {
+      backgroundColor: colors.card,
       borderColor: colors.border,
     },
-    cardTitle: {
+    text: {
       color: colors.text,
     },
-    cardSubtitle: {
+    textSecondary: {
       color: colors.textSecondary,
     },
-    percentageText: {
+    successText: {
       color: colors.primary,
     },
-    earningsText: {
-      color: colors.success,
+    statusBadge: {
+      backgroundColor: 'rgba(29, 131, 89, 0.1)',
+      borderColor: 'rgba(29, 131, 89, 0.3)',
     },
     machineName: {
       color: colors.text,
     },
-    machineLocation: {
+    machineAddress: {
       color: colors.textSecondary,
     },
     buttonText: {
       color: colors.text,
     },
-    statsValue: {
-      color: colors.primary,
-    },
-    statsLabel: {
-      color: colors.textSecondary,
+    backButton: {
+      backgroundColor: colors.primary,
     },
   }), [colors])
 
@@ -129,226 +103,171 @@ export default function OwnershipScreen() {
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch'
     }}>
-      {/* Confetti Animation */}
-      {showConfetti && (
-        <View style={styles.confettiContainer}>
-          {[...Array(20)].map((_, index) => (
-            <MotiView
-              key={index}
-              from={{
-                opacity: 1,
-                translateY: -100,
-                translateX: Math.random() * width - width / 2,
-                rotate: '0deg',
-                scale: 1,
-              }}
-              animate={{
-                opacity: 0,
-                translateY: height + 100,
-                translateX: Math.random() * width - width / 2,
-                rotate: '360deg',
-                scale: 0.5,
-              }}
-              transition={{
-                type: 'timing',
-                duration: 3000,
-                delay: index * 100,
-              }}
-              style={[
-                styles.confetti,
-                {
-                  backgroundColor: ['#5252D7', '#8484FE', '#CC940A', '#1D8359', '#FF5F52'][index % 5],
-                  left: Math.random() * width,
-                }
-              ]}
-            />
-          ))}
-        </View>
-      )}
-
-        {/* Modern Success Header */}
-        <MotiView
-          from={{ opacity: 0, translateY: -50 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{
-            type: 'spring',
-            damping: 15,
-            stiffness: 100,
-          }}
-          style={[styles.modernHeader, { paddingTop: responsive(90, 100, 110) }]}
-        >
-          <View style={styles.headerContent}>
-            <MotiView
-              from={{ scale: 0, rotate: '0deg' }}
-              animate={{ scale: 1, rotate: '360deg' }}
-              transition={{
-                type: 'spring',
-                damping: 10,
-                stiffness: 100,
-                delay: 200,
-              }}
-              style={styles.successIcon}
-            >
-              <Text style={styles.successEmoji}>🎉</Text>
-            </MotiView>
-            
-            <View style={styles.headerText}>
-              <Text style={dynamicStyles.title}>Congratulations!</Text>
-              <Text style={dynamicStyles.subtitle}>
-                You now own a piece of {machine.name}
-              </Text>
-            </View>
-          </View>
-        </MotiView>
-
-          {/* Ownership Card */}
+        {/* Main Content Wrapper */}
+        <View style={styles.mainWrapper}>
+          {/* Modern Hero Section */}
+          <LinearGradient
+            colors={GRADIENTS.primary as any}
+            style={styles.heroSection}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
           <MotiView
-            from={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
+            from={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
             transition={{
               type: 'spring',
               damping: 15,
-              stiffness: 100,
-              delay: 300,
+              stiffness: 150,
             }}
-            style={styles.ownershipCard}
           >
-            <View style={[styles.cardGradient, dynamicStyles.cardBackground]}>
-              {/* Machine Image */}
+            <View style={styles.heroContent}>
+              <View style={styles.successIconContainer}>
+                <Text style={styles.successIcon}>✅</Text>
+              </View>
+              <Text style={[styles.heroTitle, dynamicStyles.title]}>
+                Success!
+              </Text>
+              <Text style={[styles.heroSubtitle, dynamicStyles.subtitle]}>
+                Machine transaction completed successfully
+              </Text>
+            </View>
+          </MotiView>
+        </LinearGradient>
+
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          {/* Machine Overview Card */}
+          <MotiView
+            from={{ opacity: 0, translateY: 30 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{
+              type: 'timing',
+              duration: 600,
+              delay: 200,
+            }}
+            style={[styles.overviewCard, dynamicStyles.card]}
+          >
+            <View style={styles.overviewHeader}>
               <View style={styles.machineImageContainer}>
-                <Image 
+                <Image
                   source={
-                    machine.image?.includes('coffee-robo-image.png') || machine.type === 'RoboCafe'
+                    machine.type === 'RoboCafe'
                       ? require('../../assets/coffee-robo-image.png')
                       : require('../../assets/humanoid.png')
                   }
                   style={styles.machineImage}
                   resizeMode="cover"
                 />
-                <View style={styles.ownershipBadge}>
-                  <Text style={styles.ownershipBadgeText}>OWNED</Text>
-                </View>
               </View>
-
-              {/* Ownership Details */}
-              <View style={styles.ownershipDetails}>
-                <Text style={[styles.machineName, dynamicStyles.machineName]}>{machine.name}</Text>
-                <Text style={[styles.machineType, dynamicStyles.cardSubtitle]}>{machine.type}</Text>
-                
-                {/* Ownership Percentage */}
-                <View style={styles.percentageContainer}>
-                  <Text style={[styles.percentageLabel, dynamicStyles.statsLabel]}>Ownership %</Text>
-                  <Text style={[styles.percentageValue, dynamicStyles.percentageText]}>
-                    {ownershipLoading ? 'Loading...' : `${ownershipPercentage}%`}
-                  </Text>
-                </View>
-
-                {/* Current Claimable Rewards */}
-                <View style={styles.earningsContainer}>
-                  <Text style={[styles.earningsLabel, dynamicStyles.statsLabel]}>Current Rewards (Claimable)</Text>
-                  <View style={styles.tokenValueContainer}>
-                    <Text style={[styles.earningsValue, dynamicStyles.earningsText]}>
-                      {claimableLoading ? 'Loading...' : `${parseFloat(claimableAmount || '0').toFixed(4)}`}
-                    </Text>
-                    <Image source={require('../../assets/peaq-logo.svg')} style={styles.tokenLogo} />
-                  </View>
-                </View>
-
-                {/* Fractional Shares Owned */}
-                <View style={styles.tokensContainer}>
-                  <Text style={[styles.tokensLabel, dynamicStyles.statsLabel]}>Fractional Shares Owned</Text>
-                  <Text style={[styles.tokensValue, dynamicStyles.statsValue]}>
-                    {shareBalanceLoading ? 'Loading...' : `${parseInt(shareBalance || '0').toLocaleString()}`}
-                  </Text>
-                </View>
-
-                {/* Your Share of Lifetime Revenue */}
-                <View style={styles.revenueContainer}>
-                  <Text style={[styles.revenueLabel, dynamicStyles.statsLabel]}>Your Share of Lifetime Revenue</Text>
-                  <View style={styles.tokenValueContainer}>
-                    <Text style={[styles.revenueValue, dynamicStyles.earningsText]}>
-                      {machineInfoLoading ? 'Loading...' : `${userShareOfLifetimeRevenue}`}
-                    </Text>
-                    <Image source={require('../../assets/peaq-logo.svg')} style={styles.tokenLogo} />
-                  </View>
-                </View>
-
-                {/* Machine Revenue Stats */}
-                <View style={styles.machineStatsContainer}>
-                  <Text style={[styles.statsTitle, dynamicStyles.statsLabel]}>Machine Revenue Stats</Text>
-                  
-                  <View style={styles.statRow}>
-                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Total Lifetime Revenue:</Text>
-                    <View style={styles.statValueContainer}>
-                      <Text style={[styles.statValue, dynamicStyles.statsValue]}>
-                        {machineInfoLoading ? 'Loading...' : `${parseFloat(machineInfo?.lifetimeRevenue || '0').toFixed(4)}`}
-                      </Text>
-                      <Image source={require('../../assets/peaq-logo.svg')} style={styles.statTokenLogo} />
-                    </View>
-                  </View>
-                  
-                  <View style={styles.statRow}>
-                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Unallocated Revenue:</Text>
-                    <View style={styles.statValueContainer}>
-                      <Text style={[styles.statValue, dynamicStyles.statsValue]}>
-                        {machineInfoLoading ? 'Loading...' : `${parseFloat(machineInfo?.unallocatedRevenue || '0').toFixed(4)}`}
-                      </Text>
-                      <Image source={require('../../assets/peaq-logo.svg')} style={styles.statTokenLogo} />
-                    </View>
-                  </View>
-                  
-                  <View style={styles.statRow}>
-                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Your Share of Unallocated:</Text>
-                    <View style={styles.statValueContainer}>
-                      <Text style={[styles.statValue, dynamicStyles.statsValue]}>
-                        {machineInfoLoading ? 'Loading...' : `${userShareOfUnallocatedRevenue}`}
-                      </Text>
-                      <Image source={require('../../assets/peaq-logo.svg')} style={styles.statTokenLogo} />
-                    </View>
-                  </View>
-                  
-                  
-                  <View style={styles.statRow}>
-                    <Text style={[styles.statLabel, dynamicStyles.statsLabel]}>Total Shares:</Text>
-                    <Text style={[styles.statValue, dynamicStyles.statsValue]}>
-                      {machineInfoLoading ? 'Loading...' : `${parseInt(machineInfo?.totalShares || '0').toLocaleString()}`}
-                    </Text>
-                  </View>
+              <View style={styles.overviewInfo}>
+                <Text style={[styles.overviewTitle, dynamicStyles.machineName]}>
+                  {machineInfo?.name || machine.name}
+                </Text>
+                <Text style={[styles.overviewSubtitle, dynamicStyles.machineAddress]}>
+                  {machine.type} Machine
+                </Text>
+                <View style={[styles.statusIndicator, dynamicStyles.statusBadge]}>
+                  <Text style={styles.statusText}>Transaction Complete</Text>
                 </View>
               </View>
             </View>
           </MotiView>
 
-          {/* Action Buttons */}
+          {/* Stats Grid */}
           <MotiView
             from={{ opacity: 0, translateY: 30 }}
             animate={{ opacity: 1, translateY: 0 }}
             transition={{
-              type: 'spring',
-              damping: 15,
-              stiffness: 100,
+              type: 'timing',
+              duration: 600,
+              delay: 400,
+            }}
+            style={styles.statsGrid}
+          >
+            <View style={[styles.statCard, dynamicStyles.card]}>
+              <Text style={[styles.statLabel, dynamicStyles.textSecondary]}>Price Paid</Text>
+              <Text style={[styles.statValue, dynamicStyles.text]}>
+                {machineInfo?.price || machine.price}
+              </Text>
+              <Text style={[styles.statUnit, dynamicStyles.textSecondary]}>PEAQ</Text>
+            </View>
+            
+            <View style={[styles.statCard, dynamicStyles.card]}>
+              <Text style={[styles.statLabel, dynamicStyles.textSecondary]}>Platform Fee</Text>
+              <Text style={[styles.statValue, dynamicStyles.text]}>
+                {machineInfo?.platformFeeBps || machine.platformFeeBps}
+              </Text>
+              <Text style={[styles.statUnit, dynamicStyles.textSecondary]}>bps</Text>
+            </View>
+          </MotiView>
+
+          {/* Token Balance Card */}
+          <MotiView
+            from={{ opacity: 0, translateY: 30 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{
+              type: 'timing',
+              duration: 600,
               delay: 600,
             }}
-            style={styles.actionsContainer}
+            style={[styles.tokenCard, dynamicStyles.card]}
+          >
+            <View style={styles.tokenHeader}>
+              <Text style={[styles.tokenTitle, dynamicStyles.text]}>Your Tokens</Text>
+              <Text style={[styles.tokenSubtitle, dynamicStyles.textSecondary]}>
+                Profit-sharing tokens earned
+              </Text>
+            </View>
+            
+            <View style={styles.tokenBalanceDisplay}>
+              <View style={styles.tokenIconContainer}>
+                <Text style={styles.tokenIcon}>🪙</Text>
+              </View>
+              <View style={styles.tokenBalanceInfo}>
+                <Text style={[styles.tokenBalanceValue, dynamicStyles.successText]}>
+                  {peaqPFTBalanceLoading ? 'Loading...' : `${parseFloat(peaqPFTBalance || '0')}`}
+                </Text>
+                <Text style={[styles.tokenBalanceSymbol, dynamicStyles.textSecondary]}>
+                  peaqPFT
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.tokenDescription}>
+              <Text style={[styles.tokenDescriptionText, dynamicStyles.textSecondary]}>
+                These tokens represent your share in the machine's future profits and can be used for governance and rewards.
+              </Text>
+            </View>
+          </MotiView>
+
+          {/* Back Button */}
+          <MotiView
+            from={{ opacity: 0, translateY: 20 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{
+              type: 'timing',
+              duration: 600,
+              delay: 800,
+            }}
+            style={styles.backButtonContainer}
           >
             <TouchableOpacity
-              style={styles.secondaryButton}
+              style={[styles.backButton, dynamicStyles.backButton]}
               onPress={handleBackToMachines}
               activeOpacity={0.8}
             >
-              <Text style={[styles.secondaryButtonText, dynamicStyles.buttonText]}>Explore More Machines</Text>
+              <Text style={styles.backButtonIcon}>←</Text>
+              <Text style={[styles.backButtonText, dynamicStyles.buttonText]}>
+                Back to Machines
+              </Text>
             </TouchableOpacity>
           </MotiView>
-
-          {/* Extra content to ensure scrolling */}
-          {/* <View style={styles.extraContent}>
-            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🎉 Congratulations on your first machine ownership!</Text>
-            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>💰 Start earning passive income from autonomous machines</Text>
-            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>📈 Track your earnings in the dashboard</Text>
-            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🔄 Explore more machines to diversify your portfolio</Text>
-            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>🚀 Join the machine economy revolution!</Text>
-            <Text style={[styles.extraText, dynamicStyles.cardSubtitle]}>💎 Your fractional ownership is now live</Text>
-          </View> */}
+          
+          {/* Bottom Spacer */}
+          <View style={styles.bottomSpacer} />
+        </View>
+        </View>
     </div>
   )
 }
@@ -356,309 +275,219 @@ export default function OwnershipScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0E0D0C',
   },
-  confettiContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
+  mainWrapper: {
+    paddingTop: responsive(20, 30, 40),
+    paddingBottom: responsive(40, 50, 60),
   },
-  confetti: {
-    position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  heroSection: {
+    paddingTop: responsive(100, 120, 140),
+    paddingBottom: responsive(40, 50, 60),
+    paddingHorizontal: responsive(20, 24, 28),
+    justifyContent: 'center',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  gradientContent: {
-    minHeight: height,
-    paddingHorizontal: 32,
-    paddingTop: 100,
-    paddingBottom: 120,
-  },
-  header: {
+  heroContent: {
     alignItems: 'center',
-    marginBottom: 32,
   },
-  modernHeader: {
+  successIconContainer: {
+    width: responsive(80, 90, 100),
+    height: responsive(80, 90, 100),
+    borderRadius: responsive(40, 45, 50),
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-  },
-  headerContent: {
-    alignItems: 'center',
-    gap: 16,
+    justifyContent: 'center',
+    marginBottom: responsive(20, 24, 28),
   },
   successIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(82, 82, 215, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(82, 82, 215, 0.3)',
+    fontSize: responsive(40, 45, 50),
   },
-  headerText: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  successEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  heroTitle: {
+    fontSize: responsive(28, 32, 36),
     fontFamily: 'NB International Pro Bold',
     textAlign: 'center',
+    marginBottom: responsive(12, 16, 20),
+    lineHeight: responsive(36, 40, 44),
   },
-  subtitle: {
-    fontSize: 18,
-    textAlign: 'center',
+  heroSubtitle: {
+    fontSize: responsive(16, 18, 20),
     fontFamily: 'NB International Pro',
+    textAlign: 'center',
+    lineHeight: responsive(22, 24, 26),
+    opacity: 0.9,
+    maxWidth: responsive(300, 340, 380),
   },
-  ownershipCard: {
-    marginBottom: 40,
-    marginHorizontal: 8,
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...GLASSMORPHISM.shadow,
+  mainContent: {
+    padding: responsive(20, 24, 28),
+    paddingTop: responsive(24, 28, 32),
   },
-  cardGradient: {
-    padding: 32,
+  overviewCard: {
+    borderRadius: responsive(20, 24, 28),
+    padding: responsive(24, 28, 32),
+    marginBottom: responsive(20, 24, 28),
+    borderWidth: 1,
+    ...GLASSMORPHISM,
+  },
+  overviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   machineImageContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  machineImage: {
-    width: responsive(100, 120, 140),
-    height: responsive(100, 120, 140),
-    borderRadius: 16,
+    width: responsive(70, 80, 90),
+    height: responsive(70, 80, 90),
+    borderRadius: responsive(16, 18, 20),
+    overflow: 'hidden',
+    marginRight: responsive(20, 24, 28),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  ownershipBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#06B6D4',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  machineImage: {
+    width: '100%',
+    height: '100%',
   },
-  ownershipBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  overviewInfo: {
+    flex: 1,
+  },
+  overviewTitle: {
+    fontSize: responsive(20, 22, 24),
     fontFamily: 'NB International Pro Bold',
+    marginBottom: responsive(6, 8, 10),
   },
-  ownershipDetails: {
-    alignItems: 'center',
-  },
-  machineName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    fontFamily: 'NB International Pro Bold',
-    textAlign: 'center',
-  },
-  machineType: {
-    fontSize: 16,
-    color: '#A7A6A5',
-    marginBottom: 24,
+  overviewSubtitle: {
+    fontSize: responsive(14, 16, 18),
     fontFamily: 'NB International Pro',
-    textAlign: 'center',
+    opacity: 0.7,
+    marginBottom: responsive(12, 14, 16),
   },
-  percentageContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  percentageLabel: {
-    fontSize: 14,
-    color: '#A7A6A5',
-    marginBottom: 8,
-    fontFamily: 'NB International Pro',
-  },
-  percentageValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#06B6D4',
-    fontFamily: 'NB International Pro Bold',
-  },
-  earningsContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  earningsLabel: {
-    fontSize: 14,
-    color: '#A7A6A5',
-    marginBottom: 8,
-    fontFamily: 'NB International Pro',
-  },
-  earningsValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    fontFamily: 'NB International Pro Bold',
-  },
-  tokensContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  tokensLabel: {
-    fontSize: 14,
-    color: '#A7A6A5',
-    marginBottom: 8,
-    fontFamily: 'NB International Pro',
-  },
-  tokensValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#5252D7',
-    fontFamily: 'NB International Pro',
-  },
-  actionsContainer: {
-    marginBottom: 40,
-    paddingHorizontal: 8,
-    gap: 20,
-  },
-  primaryButton: {
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...GLASSMORPHISM.shadow,
-  },
-  buttonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    fontFamily: 'NB International Pro Bold',
-  },
-  secondaryButton: {
-    backgroundColor: GLASSMORPHISM.background,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
+  statusIndicator: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: responsive(12, 14, 16),
+    paddingVertical: responsive(6, 8, 10),
+    borderRadius: responsive(8, 10, 12),
     borderWidth: 1,
-    borderColor: GLASSMORPHISM.border,
-    ...GLASSMORPHISM.shadow,
   },
-  secondaryButtonText: {
-    fontSize: 16,
-    color: '#5252D7',
-    fontWeight: '600',
-    fontFamily: 'NB International Pro',
-  },
-  extraContent: {
-    marginTop: 40,
-    marginHorizontal: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    backgroundColor: 'rgba(82, 82, 215, 0.05)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.1)',
-  },
-  extraText: {
-    fontSize: 14,
-    color: '#A7A6A5',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontFamily: 'NB International Pro',
-    lineHeight: 20,
-  },
-  revenueContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  revenueLabel: {
-    fontSize: 14,
-    color: '#A7A6A5',
-    marginBottom: 8,
-    fontFamily: 'NB International Pro',
-  },
-  revenueValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  statusText: {
+    fontSize: responsive(12, 14, 16),
     fontFamily: 'NB International Pro Bold',
+    color: '#1D8359',
   },
-  machineStatsContainer: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  statsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
-    textAlign: 'center',
-    fontFamily: 'NB International Pro Bold',
-  },
-  statRow: {
+  statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: responsive(16, 18, 20),
+    marginBottom: responsive(20, 24, 28),
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: responsive(16, 18, 20),
+    padding: responsive(20, 22, 24),
+    borderWidth: 1,
     alignItems: 'center',
-    marginBottom: 8,
+    ...GLASSMORPHISM,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#A7A6A5',
+    fontSize: responsive(12, 14, 16),
     fontFamily: 'NB International Pro',
-    flex: 1,
+    marginBottom: responsive(8, 10, 12),
+    textAlign: 'center',
   },
   statValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: responsive(20, 22, 24),
     fontFamily: 'NB International Pro Bold',
-    textAlign: 'right',
-    flex: 1,
+    marginBottom: responsive(4, 6, 8),
+    textAlign: 'center',
   },
-  tokenValueContainer: {
+  statUnit: {
+    fontSize: responsive(10, 12, 14),
+    fontFamily: 'NB International Pro',
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  tokenCard: {
+    borderRadius: responsive(20, 24, 28),
+    padding: responsive(24, 28, 32),
+    marginBottom: responsive(20, 24, 28),
+    borderWidth: 1,
+    ...GLASSMORPHISM,
+  },
+  tokenHeader: {
+    marginBottom: responsive(20, 24, 28),
+  },
+  tokenTitle: {
+    fontSize: responsive(20, 22, 24),
+    fontFamily: 'NB International Pro Bold',
+    marginBottom: responsive(6, 8, 10),
+  },
+  tokenSubtitle: {
+    fontSize: responsive(14, 16, 18),
+    fontFamily: 'NB International Pro',
+    opacity: 0.7,
+  },
+  tokenBalanceDisplay: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    padding: responsive(20, 24, 28),
+    borderRadius: responsive(16, 18, 20),
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.2)',
+    marginBottom: responsive(20, 24, 28),
+  },
+  tokenIconContainer: {
+    width: responsive(50, 55, 60),
+    height: responsive(50, 55, 60),
+    borderRadius: responsive(25, 27, 30),
+    backgroundColor: 'rgba(82, 82, 215, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    marginRight: responsive(16, 18, 20),
   },
-  tokenLogo: {
-    width: 20,
-    height: 20,
-    resizeMode: 'contain',
+  tokenIcon: {
+    fontSize: responsive(24, 26, 28),
   },
-  statValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
+  tokenBalanceInfo: {
     flex: 1,
   },
-  statTokenLogo: {
-    width: 16,
-    height: 16,
-    resizeMode: 'contain',
+  tokenBalanceValue: {
+    fontSize: responsive(28, 32, 36),
+    fontFamily: 'NB International Pro Bold',
+    marginBottom: responsive(4, 6, 8),
+  },
+  tokenBalanceSymbol: {
+    fontSize: responsive(14, 16, 18),
+    fontFamily: 'NB International Pro',
+    opacity: 0.7,
+  },
+  tokenDescription: {
+    paddingTop: responsive(16, 18, 20),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tokenDescriptionText: {
+    fontSize: responsive(14, 16, 18),
+    fontFamily: 'NB International Pro',
+    lineHeight: responsive(20, 22, 24),
+    opacity: 0.8,
+  },
+  backButtonContainer: {
+    marginTop: responsive(8, 12, 16),
+  },
+  backButton: {
+    borderRadius: responsive(16, 18, 20),
+    paddingVertical: responsive(18, 20, 22),
+    paddingHorizontal: responsive(24, 28, 32),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: responsive(56, 60, 64),
+    flexDirection: 'row',
+  },
+  backButtonIcon: {
+    fontSize: responsive(18, 20, 22),
+    marginRight: responsive(8, 10, 12),
+    color: '#FFFFFF',
+  },
+  backButtonText: {
+    fontSize: responsive(16, 18, 20),
+    fontFamily: 'NB International Pro Bold',
+  },
+  bottomSpacer: {
+    height: responsive(40, 50, 60),
   },
 })

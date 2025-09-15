@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   },
   centered: {
     alignSelf: 'center',
-    width: getContainerWidth(),
+    width: getContainerWidth() as any,
   },
 })
 

@@ -35,10 +35,10 @@ export default function UserBalance({ balance, onRefresh, showRefresh = true }: 
   }, [balance])
 
   const formatBalance = (amount: number) => {
-    return amount.toFixed(4)
+    return amount.toFixed(2)
   }
 
-  const getGradientColors = () => {
+  const getGradientColors = (): [string, string] => {
     return ['#5252D7', '#8484FE']
   }
 

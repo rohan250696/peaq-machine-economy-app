@@ -211,38 +211,6 @@ export default function MachineCard({
             </Text>
           </View>
           
-          {/* Earnings Breakdown */}
-          {machine.price && (
-            <View style={styles.earningsSection}>
-              <Text style={[styles.earningsTitle, dynamicStyles.earningsTitle]}>How Earnings Are Distributed</Text>
-              
-              {/* Visual Earnings Breakdown */}
-              <View style={styles.earningsBreakdown}>
-                <View style={styles.earningsBar}>
-                  <View style={[styles.earningsSegment, styles.platformFee, { width: `${(machine.platformFeeBps || 0) / 100}%` }]} />
-                  <View style={[styles.earningsSegment, styles.ownerShare, { width: `${(machine.revenueShareBps || 0) / 100}%` }]} />
-                  <View style={[styles.earningsSegment, styles.operatorShare, { width: `${100 - ((machine.platformFeeBps || 0) + (machine.revenueShareBps || 0)) / 10}%` }]} />
-                </View>
-                
-                <View style={styles.earningsLegend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendColor, styles.platformFee]} />
-                    <Text style={[styles.legendText, dynamicStyles.legendText]}>Platform Fee: {((machine.platformFeeBps || 0) / 100).toFixed(1)}%</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendColor, styles.ownerShare]} />
-                    <Text style={[styles.legendText, dynamicStyles.legendText]}>Owners: {((machine.revenueShareBps || 0) / 100).toFixed(1)}%</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendColor, styles.operatorShare]} />
-                    <Text style={[styles.legendText, dynamicStyles.legendText]}>Operator: {(100 - ((machine.platformFeeBps || 0) + (machine.revenueShareBps || 0)) / 100).toFixed(1)}%</Text>
-                  </View>
-                </View>
-              </View>
-              
-            </View>
-          )}
-          
           {/* Machine Address Section */}
           <View style={styles.machineAddressSection}>
             <Text style={[styles.machineAddressLabel, dynamicStyles.machineAddressLabel]}>Machine Identity</Text>

@@ -281,7 +281,7 @@ export default function DashboardScreen() {
                             </Text>
                           )}
                           <Text style={dynamicStyles.balanceText}>
-                            Balance: {isLoadingBalance ? 'Loading...' : `${totalBalance.toFixed(4)} PEAQ`}
+                            Balance: {isLoadingBalance ? 'Loading...' : `${totalBalance.toFixed(2)} PEAQ`}
                           </Text>
                         </View>
                       )}

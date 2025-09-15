@@ -7,6 +7,8 @@ import { safeTruncateAddress } from '../utils/safeSlice'
 import PeaqLogo from './PeaqLogo'
 import { spacing, fontSizes, responsive } from './ResponsiveLayout'
 import { useTheme } from '../contexts/ThemeContext'
+import { useProfitTokenBalance } from '../contexts/MachineManagerContext'
+import { formatEther } from 'viem'
 
 export default function UserInfoHeader() {
   const { authenticated, user: privyUser } = usePrivy()
@@ -14,6 +16,7 @@ export default function UserInfoHeader() {
   const { logout } = useLogout()
   const { address, isConnected } = useAccount()
   const { data: balance } = useBalance({ address })
+  const { balance: profitTokenBalance, isLoading: profitTokenLoading } = useProfitTokenBalance(address)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const menuRef = useRef<View>(null)
   const [isClicking, setIsClicking] = useState(false)
@@ -56,6 +59,12 @@ export default function UserInfoHeader() {
 
   const handleCopyAddress = async () => {
     try {
+      
+      if (!userAddress) {
+        Alert.alert('Error', 'No wallet address available')
+        return
+      }
+      
       if (Platform.OS === 'web') {
         // Use navigator.clipboard for web
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -86,7 +95,6 @@ export default function UserInfoHeader() {
   // Extract user name and email from different authentication methods
   const getUserInfo = () => {
     // Check Google authentication
-    console.log('privyUser', privyUser);
     if (privyUser?.google && (privyUser.google as any)?.name && (privyUser.google as any)?.email) {
       return {
         name: (privyUser.google as any).name,
@@ -130,7 +138,8 @@ export default function UserInfoHeader() {
 
   const { name: userName, email: userEmail } = getUserInfo()
   const userAddress = address || wallets[0]?.address || ''
-  const balanceFormatted = balance ? parseFloat(balance.formatted).toFixed(2) : '0.00'
+  const balanceFormatted = balance ? parseFloat(balance.formatted).toFixed(2) : '0.0'
+  const profitTokenFormatted = profitTokenBalance ? parseFloat(profitTokenBalance) : '0.0'
   
   // Extract user avatar from different authentication methods
   const getUserAvatar = () => {
@@ -297,12 +306,29 @@ export default function UserInfoHeader() {
 
               {/* Balance Section */}
               <View style={styles.balanceSection}>
+                <Text style={styles.balanceSectionTitle}>Token Balances</Text>
+                
+                {/* Native PEAQ Balance */}
                 <View style={styles.balanceInfo}>
                   <View style={styles.balanceLogoContainer}>
                     <PeaqLogo size="small" />
                   </View>
                   <View style={styles.balanceDetails}>
+                    <Text style={styles.balanceLabel}>PEAQ</Text>
                     <Text style={dynamicStyles.balanceAmount}>{balanceFormatted}</Text>
+                  </View>
+                </View>
+
+                {/* Profit Sharing Token Balance */}
+                <View style={styles.balanceInfo}>
+                  <View style={styles.balanceLogoContainer}>
+                    <Text style={styles.tokenIcon}>💰</Text>
+                  </View>
+                  <View style={styles.balanceDetails}>
+                    <Text style={styles.balanceLabel}>peaqPFT</Text>
+                    <Text style={dynamicStyles.balanceAmount}>
+                      {profitTokenLoading ? 'Loading...' : profitTokenFormatted}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -439,12 +465,29 @@ export default function UserInfoHeader() {
 
               {/* Balance Section */}
               <View style={styles.balanceSection}>
+                <Text style={styles.balanceSectionTitle}>Token Balances</Text>
+                
+                {/* Native PEAQ Balance */}
                 <View style={styles.balanceInfo}>
                   <View style={styles.balanceLogoContainer}>
                     <PeaqLogo size="small" />
                   </View>
                   <View style={styles.balanceDetails}>
+                    <Text style={styles.balanceLabel}>PEAQ</Text>
                     <Text style={dynamicStyles.balanceAmount}>{balanceFormatted}</Text>
+                  </View>
+                </View>
+
+                {/* Profit Sharing Token Balance */}
+                <View style={styles.balanceInfo}>
+                  <View style={styles.balanceLogoContainer}>
+                    <Text style={styles.tokenIcon}>💰</Text>
+                  </View>
+                  <View style={styles.balanceDetails}>
+                    <Text style={styles.balanceLabel}>peaqPFT</Text>
+                    <Text style={dynamicStyles.balanceAmount}>
+                      {profitTokenLoading ? 'Loading...' : profitTokenFormatted}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -634,8 +677,14 @@ const styles = StyleSheet.create({
   copyButton: {
     marginLeft: spacing.sm,
     padding: spacing.xs,
-    borderRadius: 4,
-    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    borderRadius: 6,
+    backgroundColor: 'rgba(82, 82, 215, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.3)',
+    minWidth: 32,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   copyIcon: {
     fontSize: fontSizes.xs,
@@ -653,25 +702,47 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     paddingVertical: spacing.sm,
   },
+  balanceSectionTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+    color: '#6B7280',
+    fontFamily: 'NB International Pro',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
   balanceInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
   },
   balanceLogoContainer: {
     padding: spacing.xs,
     borderRadius: 8,
     backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    minWidth: 32,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   balanceDetails: {
     marginLeft: spacing.md,
     flex: 1,
   },
+  balanceLabel: {
+    fontSize: fontSizes.xs,
+    color: '#9CA3AF',
+    fontFamily: 'NB International Pro',
+    marginBottom: 2,
+  },
   balanceAmount: {
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.md,
     fontWeight: 'bold',
     color: '#5252D7',
     fontFamily: 'NB International Pro Bold',
+  },
+  tokenIcon: {
+    fontSize: fontSizes.sm,
   },
 
 

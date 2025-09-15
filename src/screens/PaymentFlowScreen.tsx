@@ -5,7 +5,7 @@ import { MotiView } from 'moti'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList, Machine, PaymentFlowStep } from '../types'
-import { MACHINE_ACTIONS, GLASSMORPHISM, GRADIENTS, TOKEN_ADDRESS, PEAQ_MACHINE_MANAGER_ADDRESS } from '../constants'
+import { MACHINE_ACTIONS, GLASSMORPHISM, GRADIENTS, TOKEN_ADDRESS, PEAQ_MACHINE_MANAGER_ADDRESS, KWB_APP_WALLET_KEY, AGUNG_TESTNET_MACHINE_MANAGER_ADDRESS } from '../constants'
 import * as Clipboard from 'expo-clipboard'
 import { safeTruncateHash } from '../utils/safeSlice'
 import { useTheme } from '../contexts/ThemeContext'
@@ -13,8 +13,9 @@ import { useMachineManager } from '../contexts/MachineManagerContext'
 import { useAccount, useBalance } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { ethers } from "ethers";
+import { ethers } from "ethers"
 import MachineManagerABI from '../abi/MachineManagerABI.json'
+import ERC20ABI from '../abi/ERC20.json'
 
 const { width, height } = Dimensions.get('window')
 
@@ -31,14 +32,12 @@ export default function PaymentFlowScreen() {
   const { address } = useAccount()
   const { data: balance } = useBalance({ address })
   const { 
-    approveToken, 
     useMachine, 
-    isApproving, 
     isUsingMachine, 
-    approveError, 
     useMachineError,
-    interactWithMachine,
-    getTokenBalance
+    getTokenBalance,
+    airdropPeaqToken,
+    hasUsedMachine: checkHasUsedMachine
   } = useMachineManager()
   
   const [currentStep, setCurrentStep] = useState(0)
@@ -46,8 +45,9 @@ export default function PaymentFlowScreen() {
   const [transactionHash, setTransactionHash] = useState('')
   const [showModal, setShowModal] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [approveHash, setApproveHash] = useState<string>('')
   const [useMachineHash, setUseMachineHash] = useState<string>('')
+  const [airdropHash, setAirdropHash] = useState<string>('')
+  const [isAirdropping, setIsAirdropping] = useState(false)
   
   const actionInfo = MACHINE_ACTIONS[machine.type] || MACHINE_ACTIONS.RoboCafe // Fallback to RoboCafe if type not found
   // Use real machine price from contract data if available, otherwise fallback to action price
@@ -56,11 +56,26 @@ export default function PaymentFlowScreen() {
   const privy = usePrivy();
   const { wallets } = useWallets();
 
-  const paymentSteps: PaymentFlowStep[] = [
+  // Dynamic payment steps based on whether user has used machine before
+  const [hasUsedMachine, setHasUsedMachine] = useState<boolean | null>(null)
+  
+  // Check if user has used machine on component mount
+  useEffect(() => {
+    const checkMachineUsage = async () => {
+      if (address) {
+        const used = await checkHasUsedMachine(machine.id, address)
+        setHasUsedMachine(used)
+      }
+    }
+    checkMachineUsage()
+  }, [address, machine.id, checkHasUsedMachine])
+
+  const paymentSteps: PaymentFlowStep[] = hasUsedMachine === false ? [
+    // Steps for new users (with airdrop)
     {
-      id: 'approving',
-      title: 'Approving PEAQ tokens...',
-      description: `Approving ${price} PEAQ for machine interaction`,
+      id: 'airdrop',
+      title: 'Airdropping PEAQ tokens...',
+      description: `Getting ${(parseFloat(price.toString()) + 0.01).toFixed(4)} PEAQ (${price} + 0.01 gas fee)`,
       status: currentStep === 0 ? 'active' : currentStep > 0 ? 'completed' : 'pending'
     },
     {
@@ -75,6 +90,20 @@ export default function PaymentFlowScreen() {
       description: 'Transaction completed successfully',
       status: currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : 'pending'
     }
+  ] : [
+    // Steps for returning users (no airdrop)
+    {
+      id: 'using',
+      title: 'Using machine...',
+      description: 'Calling useMachine contract function',
+      status: currentStep === 0 ? 'active' : currentStep > 0 ? 'completed' : 'pending'
+    },
+    {
+      id: 'success',
+      title: `You got your ${actionInfo.emoji} ${action}!`,
+      description: 'Transaction completed successfully',
+      status: currentStep === 1 ? 'active' : currentStep > 1 ? 'completed' : 'pending'
+    }
   ]
 
   useEffect(() => {
@@ -87,77 +116,86 @@ export default function PaymentFlowScreen() {
       try {
         setError(null)
         
-        // Check PEAQ token balance before proceeding
-        console.log(`Checking PEAQ balance for user ${address}`)
-        const peaqBalance = await getTokenBalance(address)
-        const requiredAmount = parseFloat(price.toString())
-        const userBalance = parseFloat(peaqBalance)
+        // Check if user has already used this machine (from contract)
+        const hasUsed = await checkHasUsedMachine(machine.id, address)
         
-        console.log(`Required: ${requiredAmount} PEAQ, User has: ${userBalance} PEAQ`)
-        
-        if (userBalance < requiredAmount) {
-          setError(`Insufficient PEAQ balance. You have ${userBalance.toFixed(4)} PEAQ but need ${requiredAmount} PEAQ`)
-          return
+        if (!hasUsed) {
+          // User hasn't used machine before - airdrop PEAQ tokens
+          console.log('User eligible for airdrop, airdropping PEAQ tokens...')
+          setIsAirdropping(true)
+          setCurrentStep(0)
+
+          const wallet = wallets[0];
+          const ethereumProvider = await wallet.getEthereumProvider();
+          const provider = new ethers.BrowserProvider(ethereumProvider);
+
+          const kwbAppWallet = new ethers.Wallet(KWB_APP_WALLET_KEY, provider);
+          const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20ABI, kwbAppWallet);
+          const machinePriceNum = parseFloat(price.toString())
+          const gasFeeNum = parseFloat('0.01')
+          const totalAmount = (machinePriceNum + gasFeeNum).toString()
+          const tx = await tokenContract.transfer(address, parseEther(totalAmount));
+          await tx.wait();
+          setAirdropHash(tx?.hash);
+          console.log('Airdrop transaction hash:', tx?.hash)
+          setCurrentStep(1)
+          setIsAirdropping(false)
+        } else {
+          // User has used machine before - check balance and proceed directly
+          console.log('User has already used this machine, checking balance...')
+          
+          // Check if user has sufficient balance
+          const userBalance = balance ? parseFloat(formatEther(balance.value)) : 0
+          const requiredAmount = parseFloat(price.toString())
+          
+          if (userBalance < requiredAmount) {
+            setError(`Insufficient PEAQ balance. You need ${requiredAmount} PEAQ but only have ${userBalance.toFixed(4)} PEAQ`)
+            return
+          }
+          
+          console.log(`User has sufficient balance (${userBalance.toFixed(4)} PEAQ), proceeding with useMachine...`)
+          setCurrentStep(0) // Skip airdrop step
         }
         
-        // Step 1: Approve PEAQ tokens
+        // Step 1: Use machine
+        console.log(`Using machine ${machine.id}`)
+        
         const wallet = wallets[0];
         const ethereumProvider = await wallet.getEthereumProvider();
         const provider = new ethers.BrowserProvider(ethereumProvider);
         const signer = await provider.getSigner();
-        const erc20 = new ethers.Contract(
-          TOKEN_ADDRESS,
-          ["function approve(address spender, uint256 amount) returns (bool)"],
-          signer
-        );
-        const tx = await erc20.approve(
-          "0xA4963E5760a855AA39827FbB7691B47c2A34B755",
-          ethers.parseUnits(machine?.price?.toString() || "0", 18)
-        );
-        await tx.wait();
-        setApproveHash(tx?.hash);
-        setCurrentStep(1)
-        
-        // Step 2: Use machine
-        console.log(`Using machine ${machine.id}`)
 
         const machineManager = new ethers.Contract(
-          PEAQ_MACHINE_MANAGER_ADDRESS,
+          AGUNG_TESTNET_MACHINE_MANAGER_ADDRESS,
           MachineManagerABI,
           signer
         );
-        const machineManagerTx = await machineManager.useMachine(machine.id);
+        
+        const machineManagerTx = await machineManager.useMachine(machine.id, {value: parseEther(price.toString())});
         await machineManagerTx.wait();
         console.log('Use machine transaction hash:', machineManagerTx?.hash)
         setUseMachineHash(machineManagerTx?.hash)
         setTransactionHash(machineManagerTx?.hash)
-
-        // const useMachineHash = await useMachine(machine.id)
-        // if (useMachineHash) {
-        //   setUseMachineHash(useMachineHash)
-        //   setTransactionHash(useMachineHash) // Set the final transaction hash
-        //   console.log('Use machine transaction hash:', useMachineHash)
-        // }
-        setCurrentStep(2)
+        setCurrentStep(hasUsed ? 1 : 2) // Adjust step based on whether airdrop happened
         
-        // Step 3: Success
+        // Step 2: Success
         setIsCompleted(true)
         
         // Navigate to ownership screen after delay
-        setTimeout(() => {
-          setShowModal(false)
-          navigation.replace('Ownership', {
-            machine,
-            ownership: {
-              machineId: machine.id,
-              percentage: 0.1,
-              tokens: 10,
-              totalTokens: 1000,
-              earnings: 0.05,
-              lastEarning: new Date().toISOString()
-            }
-          })
-        }, 2000)
+        // setTimeout(() => {
+        //   setShowModal(false)
+        //   navigation.replace('Ownership', {
+        //     machine,
+        //     ownership: {
+        //       machineId: machine.id,
+        //       percentage: 0.1,
+        //       tokens: 10,
+        //       totalTokens: 1000,
+        //       earnings: 0.05,
+        //       lastEarning: new Date().toISOString()
+        //     }
+        //   })
+        // }, 2000)
         
       } catch (error) {
         console.error('Payment process error:', error)
@@ -166,7 +204,7 @@ export default function PaymentFlowScreen() {
     }
 
     processPayment()
-  }, [machine, action, navigation, address, price, approveToken, useMachine])
+  }, [machine, action, navigation, address, price, useMachine, checkHasUsedMachine, balance])
 
   const getStepIcon = (stepIndex: number, status: string) => {
     if (status === 'completed') return '✅'
@@ -184,11 +222,12 @@ export default function PaymentFlowScreen() {
     }
   }
 
-  const copyTransactionHash = async () => {
-    if (!transactionHash) return
+  const copyTransactionHash = async (hash?: string) => {
+    const hashToCopy = hash || transactionHash
+    if (!hashToCopy) return
     
     try {
-      await Clipboard.setStringAsync(transactionHash)
+      await Clipboard.setStringAsync(hashToCopy)
       Alert.alert('Copied!', 'Transaction hash copied to clipboard')
     } catch (error) {
       Alert.alert('Error', 'Failed to copy transaction hash')
@@ -239,6 +278,12 @@ export default function PaymentFlowScreen() {
     },
     buttonText: {
       color: colors.text,
+    },
+    navigationButton: {
+      backgroundColor: colors.primary,
+    },
+    navigationButtonText: {
+      color: colors.background,
     },
     closeButtonText: {
       color: colors.text,
@@ -426,8 +471,8 @@ export default function PaymentFlowScreen() {
                 </MotiView>
               )}
 
-              {/* Transaction Hash */}
-              {transactionHash && (
+              {/* Transaction Hashes */}
+              {(airdropHash || useMachineHash) && (
                 <MotiView
                   from={{ opacity: 0, translateY: 20 }}
                   animate={{ opacity: 1, translateY: 0 }}
@@ -442,33 +487,44 @@ export default function PaymentFlowScreen() {
                     numberOfLines={1}
                     adjustsFontSizeToFit={true}
                   >
-                    Transaction Hash
+                    Transaction Hashes
                   </Text>
-                  <TouchableOpacity 
-                    style={styles.transactionHash}
-                    onPress={copyTransactionHash}
-                    activeOpacity={0.7}
-                  >
-                    <Text 
-                      style={[styles.transactionHashText, dynamicStyles.hashText]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit={true}
-                    >
-                      {(() => {
-                        // Debug logging
-                        console.log('PaymentFlowScreen - transactionHash:', transactionHash, 'type:', typeof transactionHash, 'length:', transactionHash?.length);
-                        
-                        return safeTruncateHash(transactionHash);
-                      })()}
-                    </Text>
-                    <Text 
-                      style={[styles.transactionLink, dynamicStyles.buttonText]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit={true}
-                    >
-                      📋 Copy Hash
-                    </Text>
-                  </TouchableOpacity>
+                  
+                  {/* Airdrop Hash */}
+                  {airdropHash && (
+                    <View style={styles.transactionItem}>
+                      <Text style={[styles.transactionType, dynamicStyles.progressText]}>Airdrop PEAQ:</Text>
+                      <TouchableOpacity 
+                        style={styles.transactionHash}
+                        onPress={() => copyTransactionHash(airdropHash)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.transactionHashText, dynamicStyles.hashText]}>
+                          {safeTruncateHash(airdropHash)}
+                        </Text>
+                        <Text style={[styles.transactionLink, dynamicStyles.buttonText]}>📋</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  
+                  
+                  {/* Use Machine Hash */}
+                  {useMachineHash && (
+                    <View style={styles.transactionItem}>
+                      <Text style={[styles.transactionType, dynamicStyles.progressText]}>Use Machine:</Text>
+                      <TouchableOpacity 
+                        style={styles.transactionHash}
+                        onPress={() => copyTransactionHash(useMachineHash)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.transactionHashText, dynamicStyles.hashText]}>
+                          {safeTruncateHash(useMachineHash)}
+                        </Text>
+                        <Text style={[styles.transactionLink, dynamicStyles.buttonText]}>📋</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  
                 </MotiView>
               )}
 
@@ -492,6 +548,42 @@ export default function PaymentFlowScreen() {
                   >
                     Payment Successful!
                   </Text>
+                  
+                  {/* Navigation Button */}
+                  <MotiView
+                    from={{ opacity: 0, translateY: 20 }}
+                    animate={{ opacity: 1, translateY: 0 }}
+                    transition={{
+                      type: 'timing',
+                      duration: 500,
+                      delay: 500,
+                    }}
+                    style={styles.navigationButtonContainer}
+                  >
+                    <TouchableOpacity
+                      style={[styles.navigationButton, dynamicStyles.navigationButton]}
+                      onPress={() => {
+                        console.log('View Ownership Details button pressed')
+                        setShowModal(false)
+                        navigation.replace('Ownership', {
+                          machine,
+                          ownership: {
+                            machineId: machine.id,
+                            percentage: 0.1,
+                            tokens: 10,
+                            totalTokens: 1000,
+                            earnings: 0.05,
+                            lastEarning: new Date().toISOString()
+                          }
+                        })
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.navigationButtonText, dynamicStyles.navigationButtonText]}>
+                        View Ownership Details →
+                      </Text>
+                    </TouchableOpacity>
+                  </MotiView>
                 </MotiView>
               )}
             </View>
@@ -693,6 +785,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontFamily: 'NB International Pro',
   },
+  transactionItem: {
+    marginBottom: 12,
+  },
+  transactionType: {
+    fontSize: 12,
+    color: '#A7A6A5',
+    marginBottom: 4,
+    fontFamily: 'NB International Pro',
+  },
   transactionHash: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
@@ -724,5 +825,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1D8359',
     fontFamily: 'NB International Pro Bold',
+    marginBottom: 20,
+  },
+  navigationButtonContainer: {
+    marginTop: 20,
+    zIndex: 10,
+  },
+  navigationButton: {
+    backgroundColor: '#5252D7',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 220,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  navigationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'NB International Pro Bold',
+    textAlign: 'center',
   },
 })

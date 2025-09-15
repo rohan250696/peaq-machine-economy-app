@@ -14,13 +14,14 @@ import { safeTruncateAddress } from '../utils/safeSlice'
 import MachineCard from '../components/MachineCard'
 import { useCopyFeedback } from '../components/GlobalUserInfo'
 import { useTheme } from '../contexts/ThemeContext'
+import ProfitTokenIcon from '../components/ProfitTokenIcon'
 import { 
-  useMachineManager, 
   useTokenBalance, 
-  useMachineInfo,
-  useClaimableFor,
-  useOwnershipBps,
-  useAllMachines
+  useMachineCount,
+  useAllMachines,
+  useProfitTokenBalance,
+  useProfitTokenInfo,
+  useMachineManagerBalance
 } from '../contexts/MachineManagerContext'
 import { 
   spacing, 
@@ -54,33 +55,8 @@ function MachineCardWithRealData({
   columns, 
   userAddress 
 }: MachineCardWithRealDataProps) {
-  // Real-time contract data hooks
-  const { machineInfo, isLoading: machineLoading } = useMachineInfo(machine.id)
-  const { claimableAmount, isLoading: claimableLoading } = useClaimableFor(machine.id, userAddress)
-  const { ownershipBps, isLoading: ownershipLoading } = useOwnershipBps(machine.id, userAddress)
-  
-  // Create enhanced machine object with real data
-  const enhancedMachine: Machine = React.useMemo(() => {
-    if (machineInfo) {
-      return {
-        ...machine,
-        name: machineInfo.name,
-        address: machineInfo.machineAddr,
-        revenue: parseFloat(claimableAmount),
-        totalRevenue: parseFloat(machineInfo.lifetimeRevenue),
-        isActive: true, // Assume active if we can fetch data
-        // Add real contract data
-        price: parseFloat(machineInfo.price),
-        platformFeeBps: machineInfo.platformFeeBps,
-        revenueShareBps: machineInfo.revenueShareBps,
-        sharesPerPurchase: parseFloat(machineInfo.sharesPerPurchase),
-        totalShares: parseFloat(machineInfo.totalShares),
-        unallocatedRevenue: parseFloat(machineInfo.unallocatedRevenue),
-        ownershipBps: parseFloat(ownershipBps),
-      }
-    }
-    return machine
-  }, [machine, machineInfo, claimableAmount, ownershipBps])
+  // No need for individual useMachineInfo calls - we already have all the data from useAllMachines
+  // The machine object passed here already contains the real contract data processed in the main component
   
   return (
     <View 
@@ -90,12 +66,12 @@ function MachineCardWithRealData({
       ]}
     >
       <MachineCard
-        machine={enhancedMachine}
+        machine={machine}
         index={index}
         onPress={onPress}
         onCopyAddress={onCopyAddress}
         columns={columns}
-        isLoading={machineLoading || claimableLoading || ownershipLoading}
+        isLoading={false} // Data is already processed from useAllMachines
       />
     </View>
   )
@@ -110,9 +86,7 @@ export default function MachineSelectionScreen() {
   
   // Get real machines from contract
   const { machines: contractMachines, isLoading: machinesLoading, error: machinesError } = useAllMachines()
-  
-  // Machine Manager Context hooks
-  const { getAllMachines } = useMachineManager()
+  const { count: machineCount } = useMachineCount()
   
   // Create dynamic styles based on theme - use useMemo to ensure they update when theme changes
   const dynamicStyles = React.useMemo(() => StyleSheet.create({
@@ -140,6 +114,26 @@ export default function MachineSelectionScreen() {
     statLabel: {
       ...styles.statLabel,
       color: colors.textSecondary,
+    },
+    profitTokenCard: {
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+    },
+    profitTokenName: {
+      color: colors.text,
+    },
+    profitTokenSymbol: {
+      color: colors.text,
+    },
+    profitTokenBalanceLabel: {
+      color: colors.text,
+    },
+    profitTokenBalanceValue: {
+      color: colors.primary,
+    },
+    dataSourceText: {
+      color: colors.textSecondary,
+      fontSize: responsive(fontSizes.xs, fontSizes.sm, fontSizes.md),
     },
     sharesInfoSection: {
       ...styles.sharesInfoSection,
@@ -173,27 +167,38 @@ export default function MachineSelectionScreen() {
   const { ready, authenticated } = usePrivy();
   
   // Wagmi hooks
-  const { address, isConnected } = useAccount()
-  const chainId = useChainId()
-  const { data: balance } = useBalance({ address })
-  const { switchChain } = useSwitchChain()
-  const { wallets } = useWallets()
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   
-  // Real-time token balance from MachineManagerContext
-  const { balance: peaqBalance, isLoading: balanceLoading } = useTokenBalance(address || '')
+  // Get Profit Sharing Token data
+  const { balance: profitTokenBalance, isLoading: profitBalanceLoading } = useProfitTokenBalance(address)
+  const { name: profitTokenName, symbol: profitTokenSymbol, isLoading: profitInfoLoading } = useProfitTokenInfo()
+  
+  // Get MachineManager contract balance (total network revenue)
+  const { balance: machineManagerBalance, isLoading: managerBalanceLoading } = useMachineManagerBalance()
+  
+  // Check if connected to Peaq network (Chain ID: 3338 or 9990)
+  const isConnectedToPeaq = chainId === 3338 || chainId === 9990
 
-  useEffect(() => {
-    console.log('PrivyWallets wallets.map(w => w.chainId):', wallets.map(w => w.chainId))
-    console.log('Wagmi chainId:', chainId)
-  }, [wallets])
-  
-  // Check if connected to Peaq network (Chain ID: 3338)
-  const isConnectedToPeaq = chainId === 3338
-  const peaqChainId = 3338
-  
-
-  // Convert contract machines to our Machine interface using useMemo to prevent infinite loops
-  const convertedMachines = React.useMemo(() => {
+  // Convert contract machines to our Machine interface
+  const machines = React.useMemo(() => {
+    // If we're not connected to Peaq network, use mock data
+    if (!isConnectedToPeaq) {
+      return MOCK_MACHINES.map(machine => ({
+        ...machine,
+        address: address || ''
+      }))
+    }
+    
+    // If we're loading or have an error, use mock data
+    if (machinesLoading || machinesError) {
+      return MOCK_MACHINES.map(machine => ({
+        ...machine,
+        address: address || ''
+      }))
+    }
+    
+    // If no contract machines, use mock data
     if (!contractMachines || contractMachines.length === 0) {
       return MOCK_MACHINES.map(machine => ({
         ...machine,
@@ -201,16 +206,18 @@ export default function MachineSelectionScreen() {
       }))
     }
     
-    return contractMachines.map((contractMachine, index) => ({
-      id: `${index + 1}`, // Generate ID since contract doesn't provide it
+    // Use real contract machines
+    return contractMachines.map((contractMachine, index) => {
+      return {
+      id: `${index}`, // Generate ID since contract doesn't provide it
       name: contractMachine.name,
       type: (contractMachine.name.toLowerCase().includes('cafe') ? 'RoboCafe' : 'Humanoid') as 'RoboCafe' | 'Humanoid',
       image: contractMachine.name.toLowerCase().includes('cafe') 
         ? 'coffee-robo-image.png' 
         : 'humanoid.png', // Local images based on machine type
-      address: contractMachine.machineOnChainAddr,
-      revenue: parseFloat(contractMachine.lifetimeRevenue),
-      totalRevenue: parseFloat(contractMachine.lifetimeRevenue),
+      address: contractMachine.machineAddr,
+      revenue: 0, // No longer tracked in new contract
+      totalRevenue: 0, // No longer tracked in new contract
       isActive: contractMachine.exists || false,
       location: {
         name: 'Cyberpunk City',
@@ -218,45 +225,38 @@ export default function MachineSelectionScreen() {
         lng: 139.6503
       },
       // Contract data fields
-      price: parseFloat(contractMachine.price),
-      platformFeeBps: contractMachine.platformFeeBps,
-      revenueShareBps: contractMachine.revenueShareBps,
-      sharesPerPurchase: parseFloat(contractMachine.sharesPerPurchase),
-      totalShares: parseFloat(contractMachine.totalShares),
-      unallocatedRevenue: parseFloat(contractMachine.unallocatedRevenue),
-    }))
-  }, [contractMachines, address])
+      price: contractMachine.price ? parseFloat(contractMachine.price) : 0, // Convert string to number with fallback
+      platformFeeBps: contractMachine.platformFeeBps || 0, // Fallback to 0 if undefined
+      }
+    })
+  }, [contractMachines, address, machinesLoading, machinesError, isConnectedToPeaq])
 
-  // Calculate network statistics from converted machines
+  // Calculate network statistics from real machines
   const networkStats = React.useMemo(() => {
-    if (convertedMachines === MOCK_MACHINES || convertedMachines.length === 0) {
+    if (!contractMachines || contractMachines.length === 0) {
       return {
-        totalRevenue: '2,847.32',
-        activeCount: 24
+        totalRevenue: '0',
+        activeCount: 0
       }
     }
     
-    let totalRevenue = 0
     let activeCount = 0
-    
-    for (const machine of convertedMachines) {
-      totalRevenue += machine.totalRevenue
-      if (machine.isActive) {
+    for (const machine of contractMachines) {
+      if (machine.exists) {
         activeCount++
       }
     }
     
     return {
-      totalRevenue: totalRevenue.toFixed(2),
+      totalRevenue: machineManagerBalance || '0', // Use real MachineManager balance
       activeCount
     }
-  }, [convertedMachines])
+  }, [contractMachines, machineManagerBalance])
 
   // Use computed values directly instead of state to prevent infinite loops
-  const machines = convertedMachines
   const totalNetworkRevenue = networkStats.totalRevenue
   const activeMachinesCount = networkStats.activeCount
-  const isLoading = machinesLoading
+  const isLoading = machinesLoading || managerBalanceLoading
 
   useEffect(() => {
     if (!authenticated) {
@@ -265,46 +265,33 @@ export default function MachineSelectionScreen() {
     }
   }, [authenticated, navigation])
 
-  // Fetch machines from network when user connects
+  // Fetch machine count when user connects
   useEffect(() => {
     if (address && isConnected) {
-      fetchMachinesFromNetwork()
+      fetchMachineCount()
     }
   }, [address, isConnected])
 
-  // Handle network switching to Peaq
-  const handleSwitchToPeaq = async () => {
-    try {
-      await switchChain({ chainId: peaqChainId })
-    } catch (error) {
-      console.error('Failed to switch to Peaq network:', error)
-      Alert.alert('Network Switch Failed', 'Please switch to Peaq network manually in your wallet.')
-    }
-  }
-
-  // Function to fetch machines using getAllMachines
-  const fetchMachinesFromNetwork = async () => {
+  // Function to fetch machine count
+  const fetchMachineCount = async () => {
     try {
       if (!address || !isConnected) return
       
-      setNetworkFetchStatus('Fetching from network...')
-      const networkMachines = await getAllMachines()
+      setNetworkFetchStatus('Fetching machine count...')
       
-      setNetworkFetchStatus(`✅ Fetched ${networkMachines.length} machines from network`)
+      setNetworkFetchStatus(`✅ Found ${machineCount} machines on network`)
       
-      // The useAllMachines hook will automatically update with the latest data
-      // This function provides manual control over when to fetch
     } catch (error) {
-      console.error('Failed to fetch machines from network:', error)
-      setNetworkFetchStatus('❌ Failed to fetch from network')
+      console.error('Failed to fetch machine count:', error)
+      setNetworkFetchStatus('❌ Failed to fetch machine count')
     }
   }
 
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      // Fetch fresh data from the network using getAllMachines
-      await fetchMachinesFromNetwork()
+      // Fetch fresh machine count from the network
+      await fetchMachineCount()
     } catch (error) {
       console.error('Failed to refresh machines:', error)
     } finally {
@@ -405,6 +392,40 @@ export default function MachineSelectionScreen() {
         </MotiView>
       </View>
 
+      {/* Profit Sharing Token Section */}
+      <View style={styles.profitTokenContainer}>
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{
+            type: 'timing',
+            duration: 800,
+            delay: 400,
+          }}
+          style={[styles.profitTokenCard, dynamicStyles.profitTokenCard]}
+        >
+          <View style={styles.profitTokenHeader}>
+            <ProfitTokenIcon size={24} />
+            <View style={styles.profitTokenInfo}>
+              <Text style={[styles.profitTokenName, dynamicStyles.profitTokenName]}>
+                {profitInfoLoading ? 'Loading...' : (profitTokenName || 'Profit Token')}
+              </Text>
+              <Text style={[styles.profitTokenSymbol, dynamicStyles.profitTokenSymbol]}>
+                {profitInfoLoading ? '...' : (profitTokenSymbol || 'PROFIT')}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.profitTokenBalance}>
+            <Text style={[styles.profitTokenBalanceLabel, dynamicStyles.profitTokenBalanceLabel]}>
+              Your Balance:
+            </Text>
+            <Text style={[styles.profitTokenBalanceValue, dynamicStyles.profitTokenBalanceValue]}>
+              {profitBalanceLoading ? 'Loading...' : `${parseFloat(profitTokenBalance || '0')} ${profitTokenSymbol || 'PROFIT'}`}
+            </Text>
+          </View>
+        </MotiView>
+      </View>
 
           {!ready ? (
             <View style={styles.loadingContainer}>
@@ -446,34 +467,6 @@ export default function MachineSelectionScreen() {
               ))}
             </View>
           )}
-
-          {/* Ownership Shares Information Section */}
-          <View style={[styles.sharesInfoSection, dynamicStyles.sharesInfoSection]}>
-            <Text style={[styles.sharesInfoTitle, dynamicStyles.sharesInfoTitle]}>How Ownership Works</Text>
-            <Text style={[styles.sharesInfoDescription, dynamicStyles.sharesInfoDescription]}>
-              Every time you use a machine, you become a co-owner! You receive fractional shares that entitle you to a percentage of future earnings from that machine.
-            </Text>
-            <View style={styles.sharesInfoDetails}>
-              <View style={[styles.sharesInfoItem, dynamicStyles.sharesInfoItem]}>
-                <Text style={[styles.sharesInfoItemTitle, dynamicStyles.sharesInfoItemTitle]}>🎯 Fractional Ownership</Text>
-                <Text style={[styles.sharesInfoItemText, dynamicStyles.sharesInfoItemText]}>
-                  Each interaction gives you shares proportional to the machine's revenue sharing model
-                </Text>
-              </View>
-              <View style={[styles.sharesInfoItem, dynamicStyles.sharesInfoItem]}>
-                <Text style={[styles.sharesInfoItemTitle, dynamicStyles.sharesInfoItemTitle]}>💰 Passive Income</Text>
-                <Text style={[styles.sharesInfoItemText, dynamicStyles.sharesInfoItemText]}>
-                  Your shares earn you a percentage of all future revenue from the machine
-                </Text>
-              </View>
-              <View style={[styles.sharesInfoItem, dynamicStyles.sharesInfoItem]}>
-                <Text style={[styles.sharesInfoItemTitle, dynamicStyles.sharesInfoItemTitle]}>🔄 Compound Growth</Text>
-                <Text style={[styles.sharesInfoItemText, dynamicStyles.sharesInfoItemText]}>
-                  The more you use machines, the more you own, creating a growing passive income stream
-                </Text>
-              </View>
-            </View>
-          </View>
 
     </div>
   )
@@ -587,6 +580,66 @@ const styles = StyleSheet.create({
     color: '#5252D7',
     fontFamily: 'NB International Pro',
     fontWeight: '600',
+  },
+  profitTokenContainer: {
+    paddingHorizontal: safeAreaPadding.horizontal,
+    marginBottom: spacing.lg,
+  },
+  profitTokenCard: {
+    borderRadius: 16,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.2)',
+  },
+  profitTokenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  profitTokenInfo: {
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  profitTokenName: {
+    fontSize: responsive(fontSizes.md, fontSizes.lg, fontSizes.xl),
+    fontFamily: 'NB International Pro',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  profitTokenSymbol: {
+    fontSize: responsive(fontSizes.sm, fontSizes.md, fontSizes.lg),
+    fontFamily: 'NB International Pro',
+    opacity: 0.7,
+  },
+  profitTokenBalance: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  profitTokenBalanceLabel: {
+    fontSize: responsive(fontSizes.sm, fontSizes.md, fontSizes.lg),
+    fontFamily: 'NB International Pro',
+    opacity: 0.8,
+  },
+  profitTokenBalanceValue: {
+    fontSize: responsive(fontSizes.md, fontSizes.lg, fontSizes.xl),
+    fontFamily: 'NB International Pro',
+    fontWeight: '600',
+  },
+  dataSourceIndicator: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: 'rgba(82, 82, 215, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(82, 82, 215, 0.2)',
+  },
+  dataSourceText: {
+    fontSize: responsive(fontSizes.xs, fontSizes.sm, fontSizes.md),
+    fontFamily: 'NB International Pro',
+    textAlign: 'center',
+    opacity: 0.8,
   },
   loadingContainer: {
     flex: 1,
