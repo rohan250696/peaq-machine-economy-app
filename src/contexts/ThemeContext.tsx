@@ -5,14 +5,40 @@ interface ThemeContextType {
   isDarkMode: boolean
   toggleTheme: () => void
   colors: {
+    // Core design system colors (OKLCH converted to hex)
     background: string
-    surface: string
+    foreground: string
+    card: string
+    cardForeground: string
+    popover: string
+    popoverForeground: string
     primary: string
+    primaryForeground: string
     secondary: string
+    secondaryForeground: string
+    muted: string
+    mutedForeground: string
+    accent: string
+    accentForeground: string
+    destructive: string
+    border: string
+    input: string
+    ring: string
+    // Peaq brand colors
+    peaqPurple: string
+    peaqPurpleHover: string
+    peaqDarkPurple: string
+    peaqCtaPurple: string
+    peaqActionBg: string
+    peaqActionBgHover: string
+    peaqAssetsBg: string
+    peaqDollarSign: string
+    peaqPlaceholder: string
+    peaqSwapIcon: string
+    // Legacy compatibility
+    surface: string
     text: string
     textSecondary: string
-    border: string
-    card: string
     header: string
     success: string
     warning: string
@@ -27,7 +53,7 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
+  const [isDarkMode, setIsDarkMode] = useState(false) // Default to dark mode
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode)
@@ -39,33 +65,71 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       const body = document.body
       const root = document.documentElement
       
+      // Apply theme class to body for CSS gradients
       if (isDarkMode) {
-        body.style.backgroundColor = '#0F0F0F'
-        body.style.color = '#FFFFFF'
-        root.style.backgroundColor = '#0F0F0F'
-        root.style.color = '#FFFFFF'
+        body.className = 'dark'
+        body.style.background = 'linear-gradient(135deg, #1F2937 0%, #374151 25%, #4B5563 50%, #374151 75%, #1F2937 100%)'
+        body.style.color = '#FBFBFB'
+        root.style.background = 'linear-gradient(135deg, #1F2937 0%, #374151 25%, #4B5563 50%, #374151 75%, #1F2937 100%)'
+        root.style.color = '#FBFBFB'
+        root.className = 'dark'
       } else {
-        body.style.backgroundColor = '#FAFBFC'
-        body.style.color = '#1F2937'
-        root.style.backgroundColor = '#FAFBFC'
-        root.style.color = '#1F2937'
+        body.className = ''
+        body.style.background = 'linear-gradient(135deg, #E5E7EB 0%, #F3F4F6 25%, #FFFFFF 50%, #F9FAFB 75%, #E5E7EB 100%)'
+        body.style.color = '#252525'
+        root.style.background = 'linear-gradient(135deg, #E5E7EB 0%, #F3F4F6 25%, #FFFFFF 50%, #F9FAFB 75%, #E5E7EB 100%)'
+        root.style.color = '#252525'
+        root.className = ''
       }
+      
+      // Force background attachment
+      body.style.backgroundAttachment = 'fixed'
+      body.style.backgroundRepeat = 'no-repeat'
+      body.style.backgroundSize = 'cover'
     }
   }, [isDarkMode])
 
   const colors = {
-    background: isDarkMode ? '#0F0F0F' : '#FAFBFC',
-    surface: isDarkMode ? '#1A1A1A' : '#F1F3F4',
-    primary: isDarkMode ? '#5252D7' : '#4F46E5',
-    secondary: isDarkMode ? '#8484FE' : '#6366F1',
-    text: isDarkMode ? '#FFFFFF' : '#1F2937',
-    textSecondary: isDarkMode ? '#A7A6A5' : '#6B7280',
-    border: isDarkMode ? 'rgba(82, 82, 215, 0.2)' : 'rgba(79, 70, 229, 0.15)',
-    card: isDarkMode ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-    header: isDarkMode ? 'rgba(82, 82, 215, 0.15)' : 'rgba(79, 70, 229, 0.08)',
-    success: isDarkMode ? '#10B981' : '#059669',
-    warning: isDarkMode ? '#F59E0B' : '#D97706',
-    error: isDarkMode ? '#EF4444' : '#DC2626',
+    // Core design system colors (OKLCH converted to hex)
+    background: isDarkMode ? 'transparent' : 'transparent',
+    foreground: isDarkMode ? '#FBFBFB' : '#252525',
+    card: isDarkMode ? '#343434' : '#FFFFFF',
+    cardForeground: isDarkMode ? '#FBFBFB' : '#252525',
+    popover: isDarkMode ? '#343434' : '#FFFFFF',
+    popoverForeground: isDarkMode ? '#FBFBFB' : '#252525',
+    primary: isDarkMode ? '#EBEBEB' : '#343434',
+    primaryForeground: isDarkMode ? '#343434' : '#FBFBFB',
+    secondary: isDarkMode ? '#444444' : '#F7F7F7',
+    secondaryForeground: isDarkMode ? '#FBFBFB' : '#343434',
+    muted: isDarkMode ? '#444444' : '#F7F7F7',
+    mutedForeground: isDarkMode ? '#B5B5B5' : '#8E8E8E',
+    accent: isDarkMode ? '#444444' : '#F7F7F7',
+    accentForeground: isDarkMode ? '#FBFBFB' : '#343434',
+    destructive: isDarkMode ? '#C73E1D' : '#DC2626',
+    border: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#EBEBEB',
+    input: isDarkMode ? 'rgba(255, 255, 255, 0.15)' : '#EBEBEB',
+    ring: isDarkMode ? '#8E8E8E' : '#B5B5B5',
+
+    // Peaq brand colors
+    peaqPurple: '#6666FE',
+    peaqPurpleHover: '#5555ED',
+    peaqDarkPurple: '#2F1D74',
+    peaqCtaPurple: '#8484FE',
+    peaqActionBg: '#F0F0FF',
+    peaqActionBgHover: '#E0E0FF',
+    peaqAssetsBg: '#F8F7F6',
+    peaqDollarSign: '#A7A6A5',
+    peaqPlaceholder: '#747372',
+    peaqSwapIcon: '#5B5A59',
+
+    // Legacy compatibility (mapped to new system)
+    surface: isDarkMode ? '#343434' : '#FFFFFF',
+    text: isDarkMode ? '#FBFBFB' : '#252525',
+    textSecondary: isDarkMode ? '#B5B5B5' : '#8E8E8E',
+    header: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#F7F7F7',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: isDarkMode ? '#C73E1D' : '#DC2626',
   }
 
   return (

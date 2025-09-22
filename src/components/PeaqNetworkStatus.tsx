@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { usePrivy, useWallets } from '../hooks/usePlatformAuth';
 import { useAccount, useChainId, useSwitchChain } from '../hooks/usePlatformWagmi';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface PeaqNetworkStatusProps {
   onNetworkSwitch?: () => void;
@@ -18,6 +19,32 @@ export default function PeaqNetworkStatus({
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const [isSwitching, setIsSwitching] = useState(false);
+  const { colors } = useTheme();
+
+  // Create dynamic styles based on theme
+  const dynamicStyles = React.useMemo(() => StyleSheet.create({
+    container: {
+      ...styles.container,
+      backgroundColor: colors.card,
+      borderColor: colors.border,
+    },
+    statusText: {
+      ...styles.statusText,
+      color: colors.cardForeground,
+    },
+    networkInfo: {
+      ...styles.chainText,
+      color: colors.mutedForeground,
+    },
+    switchButton: {
+      ...styles.switchButton,
+      backgroundColor: colors.peaqPurple,
+    },
+    switchButtonText: {
+      ...styles.switchButtonText,
+      color: colors.primaryForeground,
+    },
+  }), [colors])
 
   const isOnPeaqNetwork = chainId === 3338;
   const isReady = authenticated && isConnected;
@@ -53,16 +80,16 @@ export default function PeaqNetworkStatus({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dynamicStyles.container]}>
       <View style={[
         styles.statusIndicator, 
         isOnPeaqNetwork ? styles.connected : styles.wrongNetwork
       ]} />
       <View style={styles.statusInfo}>
-        <Text style={styles.statusText}>
+        <Text style={[styles.statusText, dynamicStyles.statusText]}>
           {isOnPeaqNetwork ? 'Connected to Peaq Network' : 'Wrong Network'}
         </Text>
-        <Text style={styles.chainText}>
+        <Text style={[styles.chainText, dynamicStyles.networkInfo]}>
           Chain ID: {chainId} {isOnPeaqNetwork ? '(Peaq)' : '(Not Peaq)'}
         </Text>
       </View>

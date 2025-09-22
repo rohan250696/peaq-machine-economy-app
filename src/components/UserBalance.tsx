@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MotiView } from 'moti'
 import { spacing, fontSizes } from '../utils/responsive'
+import { useTheme } from '../contexts/ThemeContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface UserBalanceProps {
   balance: number
@@ -12,6 +14,8 @@ interface UserBalanceProps {
 
 export default function UserBalance({ balance, onRefresh, showRefresh = true }: UserBalanceProps) {
   const [animatedBalance, setAnimatedBalance] = useState(0)
+  const { colors } = useTheme()
+  const { t } = useLanguage()
 
   useEffect(() => {
     // Animate balance change
@@ -39,7 +43,7 @@ export default function UserBalance({ balance, onRefresh, showRefresh = true }: 
   }
 
   const getGradientColors = (): [string, string] => {
-    return ['#5252D7', '#8484FE']
+    return [colors.peaqPurple, colors.peaqCtaPurple]
   }
 
   return (
@@ -61,7 +65,7 @@ export default function UserBalance({ balance, onRefresh, showRefresh = true }: 
       >
         <View style={styles.content}>
           <View style={styles.balanceInfo}>
-            <Text style={styles.label}>Wallet Balance</Text>
+            <Text style={styles.label}>{t('common.balance')}</Text>
             <MotiView
               from={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -71,11 +75,11 @@ export default function UserBalance({ balance, onRefresh, showRefresh = true }: 
               }}
             >
               <Text style={styles.balance}>
-                {formatBalance(animatedBalance)} PEAQ
+                {formatBalance(animatedBalance)} {t('units.peaq')}
               </Text>
             </MotiView>
             <Text style={styles.subtext}>
-              Available for machine interactions
+{t('userBalance.available')}
             </Text>
           </View>
           

@@ -12,6 +12,8 @@ import PlatformProviders from './src/components/PlatformProviders'
 import GlobalUserInfo from './src/components/GlobalUserInfo'
 import { ThemeProvider } from './src/contexts/ThemeContext'
 import { MachineManagerProvider } from './src/contexts/MachineManagerContext'
+import { SidebarProvider } from './src/contexts/SidebarContext'
+import { LanguageProvider } from './src/contexts/LanguageContext'
 
 import tamaguiConfig from './tamagui.config'
 import { useFonts } from 'expo-font'
@@ -75,6 +77,8 @@ export default function App() {
 
   const [fontsLoaded] = useFonts({
     'NB International Pro': require('./assets/fonts/nb_international_pro_regular-webfont.ttf'),
+    'NB International Pro Light': require('./assets/fonts/nb_international_pro_light-webfont.ttf'),
+    'NB International Pro Medium': require('./assets/fonts/nb_international_pro_medium-webfont.ttf'),
     'NB International Pro Bold': require('./assets/fonts/nb_international_pro_bold-webfont.ttf'),
   })
 
@@ -83,44 +87,49 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <PlatformProviders>
-        <MachineManagerProvider>
-          <TamaguiProvider config={tamaguiConfig} defaultTheme="dark">
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <SafeAreaProvider>
-                <GlobalUserInfo>
+    <LanguageProvider>
+      <ThemeProvider>
+        <SidebarProvider>
+          <PlatformProviders>
+          <MachineManagerProvider>
+            <TamaguiProvider config={tamaguiConfig} defaultTheme="light">
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                  <GlobalUserInfo>
                   <NavigationContainer>
-                <StatusBar style="light" backgroundColor="#0E0D0C" />
-                <Stack.Navigator
-                  initialRouteName="Splash"
-                  screenOptions={{
-                    headerShown: false,
-                    cardStyle: { backgroundColor: '#0E0D0C' },
-                    animation: 'default',
-                    gestureEnabled: true,
-                    cardStyleInterpolator: ({ current }) => ({
-                      cardStyle: {
-                        opacity: current.progress,
-                      },
-                    }),
-                  }}
-                >
-                  <Stack.Screen name="Splash" component={SplashScreen} />
-                  <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-                  <Stack.Screen name="MachineSelection" component={MachineSelectionScreen} />
-                  <Stack.Screen name="Dashboard" component={DashboardScreen} />
-                  <Stack.Screen name="PaymentFlow" component={PaymentFlowScreen} />
-                  <Stack.Screen name="Ownership" component={OwnershipScreen} />
-                </Stack.Navigator>
+                  <StatusBar style="light" backgroundColor="transparent" />
+                  <Stack.Navigator
+                    initialRouteName="Splash"
+                    screenOptions={{
+                      headerShown: false,
+                      cardStyle: { backgroundColor: 'transparent' },
+                      animation: 'default',
+                      gestureEnabled: true,
+                      cardStyleInterpolator: ({ current }) => ({
+                        cardStyle: {
+                          opacity: current.progress,
+                          backgroundColor: 'transparent',
+                        },
+                      }),
+                    }}
+                  >
+                    <Stack.Screen name="Splash" component={SplashScreen} />
+                    <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                    <Stack.Screen name="MachineSelection" component={MachineSelectionScreen} />
+                    <Stack.Screen name="Dashboard" component={DashboardScreen} />
+                    <Stack.Screen name="PaymentFlow" component={PaymentFlowScreen} />
+                    <Stack.Screen name="Ownership" component={OwnershipScreen} />
+                  </Stack.Navigator>
                   </NavigationContainer>
-                </GlobalUserInfo>
-              </SafeAreaProvider>
-            </GestureHandlerRootView>
-          </TamaguiProvider>
-        </MachineManagerProvider>
-      </PlatformProviders>
-    </ThemeProvider>
+                  </GlobalUserInfo>
+                </SafeAreaProvider>
+              </GestureHandlerRootView>
+            </TamaguiProvider>
+          </MachineManagerProvider>
+          </PlatformProviders>
+        </SidebarProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   )
 
 }

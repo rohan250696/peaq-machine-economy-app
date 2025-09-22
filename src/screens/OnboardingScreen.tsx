@@ -7,6 +7,7 @@ import { usePrivy, useLogin } from '../hooks/usePlatformAuth'
 import { RootStackParamList } from '../types'
 import { responsive } from '../utils/responsive'
 import { useTheme } from '../contexts/ThemeContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 const { width, height } = Dimensions.get('window')
 
@@ -17,6 +18,7 @@ export default function OnboardingScreen() {
   const { authenticated, ready } = usePrivy()
   const { login } = useLogin()
   const { colors } = useTheme()
+  const { t } = useLanguage()
   const [isLoading, setIsLoading] = useState(false)
 
   // Redirect if already authenticated
@@ -44,7 +46,7 @@ export default function OnboardingScreen() {
       await login()
     } catch (error) {
       console.error('Login failed:', error)
-      Alert.alert('Login Failed', 'Please try again')
+      Alert.alert(t('onboarding.loginFailed'), t('onboarding.tryAgain'))
     } finally {
       setIsLoading(false)
     }
@@ -53,7 +55,7 @@ export default function OnboardingScreen() {
   // Create dynamic styles based on theme
   const dynamicStyles = React.useMemo(() => StyleSheet.create({
     container: {
-      backgroundColor: colors.background,
+      backgroundColor: 'transparent',
     },
     title: {
       color: colors.text,
@@ -95,11 +97,11 @@ export default function OnboardingScreen() {
         </MotiView>
 
         {/* Title */}
-        <Text style={[styles.title, dynamicStyles.title]}>Welcome to peaq</Text>
+        <Text style={[styles.title, dynamicStyles.title]}>{t('onboarding.welcome')}</Text>
         
         {/* Subtitle */}
         <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
-          Connect your wallet to start earning from{'\n'}autonomous machines
+{t('onboarding.subtitle')}
         </Text>
 
         {/* Login Button */}
@@ -110,7 +112,7 @@ export default function OnboardingScreen() {
           activeOpacity={0.8}
         >
           <Text style={[styles.loginButtonText, dynamicStyles.buttonText]}>
-            {isLoading ? 'Connecting...' : 'Get Started'}
+{isLoading ? t('onboarding.connecting') : t('onboarding.getStarted')}
           </Text>
         </TouchableOpacity>
 
@@ -122,7 +124,7 @@ export default function OnboardingScreen() {
             style={styles.loadingContainer}
           >
             <Text style={[styles.loadingText, dynamicStyles.subtitle]}>
-              Opening login options...
+{t('onboarding.openingLogin')}
             </Text>
           </MotiView>
         )}

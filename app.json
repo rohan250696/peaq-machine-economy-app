@@ -33,13 +33,9 @@
         "Content-Security-Policy": "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' chrome-extension:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
       }
     },
-  "scheme": "peaq-machine-economy",
-  "platforms": [
-    "ios",
-    "android",
-    "web"
-  ],
-  "sdkVersion": "53.0.0",
+    "scheme": "peaq-machine-economy",
+    "platforms": ["ios", "android", "web"],
+    "sdkVersion": "53.0.0",
     "plugins": [
       [
         "expo-font",
@@ -56,7 +52,8 @@
     "extra": {
       "eas": {
         "projectId": "d9697365-bbf8-4eb7-9545-6e0e1d649925"
-      }
+      },
+      "kbwAppWalletKey": "${KBW_APP_WALLET_KEY}"
     },
     "owner": "rohan2506"
   }

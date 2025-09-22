@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native'
 import { StackNavigationProp } from '@react-navigation/stack'
 import { RootStackParamList } from '../types'
 import PeaqLogo from '../components/PeaqLogo'
+import { useLanguage } from '../contexts/LanguageContext'
 import { scaleWidth, scaleHeight, spacing, fontSizes, safeAreaPadding } from '../utils/responsive'
 
 const { width, height } = Dimensions.get('window')
@@ -14,6 +15,7 @@ type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splas
 
 export default function SplashScreen() {
   const navigation = useNavigation<SplashScreenNavigationProp>()
+  const { t } = useLanguage()
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -25,7 +27,7 @@ export default function SplashScreen() {
 
   return (
     <LinearGradient
-      colors={['#0E0D0C', '#1A1A1A', '#0E0D0C']}
+      colors={['#E5E7EB', '#F3F4F6', '#FFFFFF', '#F9FAFB', '#E5E7EB']}
       style={styles.container}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -63,7 +65,7 @@ export default function SplashScreen() {
             delay: 1000,
           }}
         >
-          <Text style={styles.subtitle}>Machine Economy</Text>
+          <Text style={styles.subtitle}>{t('splash.title')}</Text>
         </MotiView>
 
         {/* Description */}
@@ -77,7 +79,7 @@ export default function SplashScreen() {
           }}
         >
           <Text style={styles.description}>
-            Own, operate, and earn from{'\n'}autonomous machines
+{t('splash.description')}
           </Text>
         </MotiView>
 

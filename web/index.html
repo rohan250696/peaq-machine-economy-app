@@ -30,6 +30,20 @@
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
+        background: transparent !important;
+      }
+      
+      /* Ensure gradient shows on all elements */
+      * {
+        box-sizing: border-box;
+      }
+      
+      /* Force gradient background to show */
+      body, html {
+        background: linear-gradient(135deg, #E5E7EB 0%, #F3F4F6 25%, #FFFFFF 50%, #F9FAFB 75%, #E5E7EB 100%) !important;
+        background-attachment: fixed !important;
+        background-repeat: no-repeat !important;
+        background-size: cover !important;
       }
     </style>
   </head>

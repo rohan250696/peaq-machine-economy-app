@@ -47,8 +47,8 @@ export const fontSizes = {
 export const containerWidths = {
   mobile: '100%',
   tablet: '90%',
-  desktop: '80%',
-  desktopLarge: '70%',
+  desktop: '448px',
+  desktopLarge: '448px',
 }
 
 // Grid columns for different screen sizes

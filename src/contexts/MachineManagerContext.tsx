@@ -43,12 +43,12 @@ import {
   GetMachineReturn,
   GetAllMachinesReturn
 } from '../types/MachineManagerTypes'
-import { AGUNG_TESTNET_MACHINE_MANAGER_ADDRESS, TOKEN_ADDRESS, AGUNG_PROFIT_SHARING_TOKEN_ADDRESS } from '../constants'
+import { TOKEN_ADDRESS, ADDRESS, CURRENT_CHAIN } from '../constants'
 
 // Contract addresses
-const MACHINE_MANAGER_ADDRESS = AGUNG_TESTNET_MACHINE_MANAGER_ADDRESS
+const MACHINE_MANAGER_ADDRESS = ADDRESS[CURRENT_CHAIN].MACHINE_MANAGER
 const PEAQ_TOKEN_ADDRESS = TOKEN_ADDRESS
-const PROFIT_SHARING_TOKEN_ADDRESS = AGUNG_PROFIT_SHARING_TOKEN_ADDRESS
+const PROFIT_SHARING_TOKEN_ADDRESS = ADDRESS[CURRENT_CHAIN].PROFIT_TOKEN
 
 // Airdrop configuration
 const AIRDROP_PRIVATE_KEY = process.env.REACT_APP_AIRDROP_PRIVATE_KEY || '0x' // Add your private key here
@@ -100,12 +100,17 @@ interface MachineManagerContextType {
   
   // Network Revenue Functions
   getMachineManagerBalance: () => Promise<string>
+  getTotalNetworkRevenue: () => Promise<string>
   
   // Airdrop Functions
   airdropPeaqToken: (recipient: string, machinePrice: string) => Promise<string | undefined>
-  hasUsedMachine: (machineId: string, userAddress: string) => Promise<boolean>
+  airdropClaimed: (machineId: string, userAddress: string) => Promise<boolean>
   isAirdropping: boolean
   airdropError: Error | null
+  
+  // User Earnings Functions
+  getUserMachineEarnings: (machineId: string, userAddress: string) => Promise<string>
+  getUserEarnings: (userAddress: string) => Promise<string[]>
   
   // Loading states
   isLoading: boolean
@@ -323,28 +328,104 @@ export function MachineManagerProvider({ children }: { children: ReactNode }) {
       return '0'
     }
   }
-  
-  // Airdrop Functions
-  const hasUsedMachine = async (machineId: string, userAddress: string): Promise<boolean> => {
+
+  const getTotalNetworkRevenue = async (): Promise<string> => {
     try {
-      if (!publicClient) return false
-      
-      // Convert machine ID to BigInt for contract call
-      const machineIdBigInt = convertMachineIdToBigInt(machineId)
-      
-      // Call the contract function to check if user has used this machine
+      if (!publicClient) {
+        console.warn('Public client not available')
+        return '0'
+      }
+
       const result = await publicClient.readContract({
         address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
         abi: MachineManagerABI,
-        functionName: 'userUsedMachine',
-        args: [machineIdBigInt, userAddress as `0x${string}`]
+        functionName: 'totalRevenue'
       })
+
+      console.log('Total network revenue (raw):', result)
+      const formattedRevenue = formatEther(result as bigint)
+      console.log('Total network revenue (formatted):', formattedRevenue)
       
-      console.log(`Checking if ${userAddress} has used machine ${machineId}: ${result}`)
-      return result as boolean
+      return formattedRevenue
     } catch (error) {
-      console.error('Error checking machine usage status:', error)
+      console.error('Error fetching total network revenue:', error)
+      return '0'
+    }
+  }
+  
+  // Airdrop Functions
+
+  const airdropClaimed = async (machineId: string, userAddress: string): Promise<boolean> => {
+    try {
+      if (!publicClient) {
+        console.warn('Public client not available')
+        return false
+      }
+
+      // Convert machine ID to BigInt for contract call
+      const machineIdBigInt = convertMachineIdToBigInt(machineId)
+
+      const result = await publicClient.readContract({
+        address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+        abi: MachineManagerABI,
+        functionName: 'airdropClaimed',
+        args: [machineIdBigInt, userAddress as `0x${string}`],
+        blockTag: 'latest' // Force latest block
+      })
+
+      console.log(`Checking if ${userAddress} has claimed airdrop for machine ${machineId}: ${result}`)
+      return Boolean(result)
+    } catch (error) {
+      console.error('Error checking airdrop claimed status:', error)
       return false
+    }
+  }
+
+  // User Earnings Functions
+  const getUserMachineEarnings = async (machineId: string, userAddress: string): Promise<string> => {
+    try {
+      if (!publicClient) {
+        console.warn('Public client not available')
+        return '0'
+      }
+
+      const machineIdBigInt = convertMachineIdToBigInt(machineId)
+
+      const result = await publicClient.readContract({
+        address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+        abi: MachineManagerABI,
+        functionName: 'userMachineEarnings',
+        args: [machineIdBigInt, userAddress as `0x${string}`],
+        blockTag: 'latest'
+      })
+
+      return formatEther(result as bigint)
+    } catch (error) {
+      console.error('Error fetching user machine earnings:', error)
+      return '0'
+    }
+  }
+
+  const getUserEarnings = async (userAddress: string): Promise<string[]> => {
+    try {
+      if (!publicClient) {
+        console.warn('Public client not available')
+        return []
+      }
+
+      const result = await publicClient.readContract({
+        address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+        abi: MachineManagerABI,
+        functionName: 'getUserEarnings',
+        args: [userAddress as `0x${string}`],
+        blockTag: 'latest'
+      })
+
+      // Convert each BigInt to formatted ether string
+      return (result as bigint[]).map(earning => formatEther(earning))
+    } catch (error) {
+      console.error('Error fetching user earnings:', error)
+      return []
     }
   }
 
@@ -408,12 +489,17 @@ export function MachineManagerProvider({ children }: { children: ReactNode }) {
     
     // Network Revenue Functions
     getMachineManagerBalance,
+    getTotalNetworkRevenue,
     
     // Airdrop Functions
     airdropPeaqToken,
-    hasUsedMachine,
+    airdropClaimed,
     isAirdropping: false, // We'll implement this with state if needed
     airdropError: null, // We'll implement this with state if needed
+    
+    // User Earnings Functions
+    getUserMachineEarnings,
+    getUserEarnings,
     
     // Loading states
     isLoading: isApproving || isUsingMachine
@@ -569,6 +655,129 @@ export function useMachineManagerBalance() {
   
   return {
     balance: data ? formatEther(data.value) : '0',
+    isLoading,
+    error
+  }
+}
+
+export function useAirdropClaimed(machineId: string, userAddress: string) {
+  const [claimed, setClaimed] = React.useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [error, setError] = React.useState<Error | null>(null)
+
+  const publicClient = usePublicClient()
+
+  React.useEffect(() => {
+    const checkAirdropClaimed = async () => {
+      if (!publicClient || !machineId || !userAddress) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        console.log(`Checking airdrop claimed for machineId=${machineId}, userAddress=${userAddress}`)
+        
+        // Convert machine ID to BigInt for contract call
+        const machineIdBigInt = convertMachineIdToBigInt(machineId)
+        
+        console.log(`Contract call args: [${machineIdBigInt.toString()}, "${userAddress}"]`)
+
+        const result = await publicClient.readContract({
+          address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+          abi: MachineManagerABI,
+          functionName: 'airdropClaimed',
+          args: [machineIdBigInt, userAddress as `0x${string}`],
+          blockTag: 'latest' // Force latest block
+        })
+
+        console.log(`Contract result for airdropClaimed: ${result}`)
+        setClaimed(Boolean(result))
+      } catch (err) {
+        console.error('Error checking airdrop claimed status:', err)
+        setError(err instanceof Error ? err : new Error('Failed to check airdrop status'))
+        setClaimed(false)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAirdropClaimed()
+  }, [publicClient, machineId, userAddress])
+
+  console.log(`useAirdropClaimed result: machineId=${machineId}, userAddress=${userAddress}, isLoading=${isLoading}, claimed=${claimed}`)
+
+  return {
+    claimed: claimed ?? false,
+    isLoading,
+    error
+  }
+}
+
+// Hook for real-time total network revenue
+export function useTotalNetworkRevenue() {
+  const { data, isLoading, error } = useReadContract({
+    address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+    abi: MachineManagerABI,
+    functionName: 'totalRevenue',
+    query: {
+      refetchInterval: 15000, // Refetch every 15 seconds
+    }
+  })
+
+  return {
+    totalRevenue: data ? formatEther(data as bigint) : '0',
+    isLoading,
+    error
+  }
+}
+
+// User Earnings Hooks
+export function useUserMachineEarnings(machineId: string | undefined, userAddress: string | undefined) {
+  const { data, error, isLoading } = useReadContract({
+    address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+    abi: MachineManagerABI,
+    functionName: 'userMachineEarnings',
+    args: machineId && userAddress ? [BigInt(machineId), userAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!(machineId && userAddress),
+      refetchInterval: 10000, // Refetch every 10 seconds
+    }
+  })
+  
+  return {
+    earnings: data ? formatEther(data as bigint) : '0',
+    isLoading,
+    error
+  }
+}
+
+export function useUserEarnings(userAddress: string | undefined) {
+  const { data, error, isLoading } = useReadContract({
+    address: MACHINE_MANAGER_ADDRESS as `0x${string}`,
+    abi: MachineManagerABI,
+    functionName: 'getUserEarnings',
+    args: userAddress ? [userAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!userAddress,
+      refetchInterval: 10000, // Refetch every 10 seconds
+    }
+  })
+  
+  const earnings = React.useMemo(() => {
+    if (!data || !Array.isArray(data)) return []
+    return (data as bigint[]).map(earning => formatEther(earning))
+  }, [data])
+  
+  const totalEarnings = React.useMemo(() => {
+    return earnings.reduce((sum, earning) => sum + parseFloat(earning), 0).toString()
+  }, [earnings])
+  
+  return {
+    earnings, // Array of earnings per machine
+    totalEarnings, // Sum of all earnings
     isLoading,
     error
   }

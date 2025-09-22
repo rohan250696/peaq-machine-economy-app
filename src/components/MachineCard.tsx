@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { MotiView } from 'moti'
 import { Machine } from '../types'
 import { useAccount } from 'wagmi'
 import { useMachineManager } from '../contexts/MachineManagerContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { 
   spacing, 
   fontSizes, 
@@ -42,7 +44,8 @@ export default function MachineCard({
   const isGridLayout = columns > 1
   const { address } = useAccount()
   const { getTokenBalance } = useMachineManager()
-  const { colors } = useTheme()
+  const { colors, isDarkMode } = useTheme()
+  const { t } = useLanguage()
 
   // Check if user has enough PEAQ balance
   useEffect(() => {
@@ -73,43 +76,43 @@ export default function MachineCard({
       borderColor: colors.border,
     },
     category: {
-      color: colors.textSecondary,
+      color: 'rgba(255, 255, 255, 0.8)',
     },
     productName: {
-      color: colors.text,
+      color: '#FFFFFF',
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
     },
     description: {
-      color: colors.textSecondary,
+      color: 'rgba(255, 255, 255, 0.9)',
     },
     featureText: {
-      color: colors.primary,
+      color: 'rgba(255, 255, 255, 0.9)',
     },
     mainPrice: {
-      color: colors.text,
+      color: '#FFFFFF',
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
     },
     priceDescription: {
-      color: colors.textSecondary,
+      color: 'rgba(255, 255, 255, 0.8)',
     },
     earningsTitle: {
-      color: colors.text,
+      color: '#FFFFFF',
     },
     legendText: {
-      color: colors.textSecondary,
+      color: 'rgba(255, 255, 255, 0.7)',
     },
-    machineAddressLabel: {
-      color: colors.text,
-    },
-    machineAddressStatus: {
-      color: colors.success,
-    },
-    machineAddressText: {
-      color: colors.primary,
+    addressLabel: {
+      color: 'rgba(255, 255, 255, 0.8)',
     },
     walletLabel: {
-      color: colors.textSecondary,
+      color: colors.mutedForeground,
     },
     walletAddress: {
-      color: colors.primary,
+      color: colors.peaqPurple,
     },
   }), [colors])
 
@@ -133,7 +136,6 @@ export default function MachineCard({
       <TouchableOpacity
         style={[
           styles.card,
-          dynamicStyles.card,
           isHovered && styles.cardHovered
         ]}
         onPress={() => onPress(machine)}
@@ -143,6 +145,34 @@ export default function MachineCard({
           onMouseLeave: () => setIsHovered(false),
         })}
       >
+        {/* Portal Wallet Style Gradient Background */}
+        <LinearGradient
+          colors={isDarkMode 
+            ? ['#4C1D95', '#6D28D9', '#8B5CF6', '#A78BFA'] // Dark theme: deeper purples
+            : ['#5B21B6', '#7C3AED', '#8B5CF6', '#A855F7'] // Light theme: vibrant purples
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBackground}
+        >
+          {/* Decorative 3D Cylinders */}
+          <View style={styles.decorativeElements}>
+            <View style={[styles.cylinder, styles.cylinder1]} />
+            <View style={[styles.cylinder, styles.cylinder2]} />
+          </View>
+          
+          {/* Content Overlay */}
+          <View style={styles.contentOverlay}>
+            
+            {/* Top Icon Circle (like Portal Wallet) */}
+            <View style={styles.topIconContainer}>
+              <View style={styles.iconCircle}>
+                <Text style={styles.iconText}>
+                  {machine.type === 'RoboCafe' ? '☕' : '🤖'}
+                </Text>
+              </View>
+            </View>
+            
         {/* Product Image Section */}
         <View style={styles.imageSection}>
           <Image 
@@ -161,14 +191,14 @@ export default function MachineCard({
             { backgroundColor: machine.isActive ? '#10B981' : '#EF4444' }
           ]}>
             <Text style={styles.statusText}>
-              {machine.isActive ? 'ACTIVE' : 'INACTIVE'}
+{machine.isActive ? t('machines.active') : t('machines.inactive')}
             </Text>
           </View>
           
           {/* Hot Sale Badge for Active Machines */}
           {machine.isActive && machine.revenue > 10 && (
             <View style={styles.hotSaleBadge}>
-              <Text style={styles.hotSaleText}>HOT SALE</Text>
+              <Text style={styles.hotSaleText}>{t('machines.hotSale')}</Text>
             </View>
           )}
         </View>
@@ -188,6 +218,19 @@ export default function MachineCard({
             {machine.type} • {machine.location.name}
           </Text>
           
+          {/* Machine Address */}
+          {machine.address && (
+            <TouchableOpacity 
+              style={styles.addressContainer}
+              onPress={() => onCopyAddress(machine.address)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.addressLabel, dynamicStyles.addressLabel]}>
+                📍 {machine.address.slice(0, 8)}...{machine.address.slice(-6)}
+              </Text>
+            </TouchableOpacity>
+          )}
+          
           {/* Features Tags */}
           <View style={styles.featuresContainer}>
             <View style={styles.featureTag}>
@@ -204,33 +247,13 @@ export default function MachineCard({
           {/* Main Price Display */}
           <View style={styles.mainPriceSection}>
             <Text style={[styles.mainPrice, dynamicStyles.mainPrice]}>
-              {isLoading ? 'Loading...' : machine.price ? `${machine.price} peaq` : `${machine.revenue.toFixed(2)} peaq`}
+              {isLoading ? t('common.loading') : machine.price ? `${machine.price} ${t('units.peaq')}` : `${machine.revenue.toFixed(2)} ${t('units.peaq')}`}
             </Text>
             <Text style={[styles.priceDescription, dynamicStyles.priceDescription]}>
-              {machine.type === 'RoboCafe' ? 'Cost to order one coffee' : 'Cost per interaction or rental slot'}
+              {machine.type === 'RoboCafe' ? t('machines.coffeeCost') : t('machines.interactionCost')}
             </Text>
           </View>
           
-          {/* Machine Address Section */}
-          <View style={styles.machineAddressSection}>
-            <Text style={[styles.machineAddressLabel, dynamicStyles.machineAddressLabel]}>Machine Identity</Text>
-            <View style={styles.machineAddressContainer}>
-              <Text style={[styles.machineAddressStatus, dynamicStyles.machineAddressStatus]}>
-                {machine.address ? '✅ Connected' : '⏳ Not yet assigned'}
-              </Text>
-              {machine.address && (
-                <TouchableOpacity 
-                  style={styles.machineAddressButton}
-                  onPress={() => onCopyAddress(machine.address)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.machineAddressText, dynamicStyles.machineAddressText]}>
-                    {machine.address.slice(0, 8)}...{machine.address.slice(-6)}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
           
           {/* Balance Indicator */}
           {/* {machine.price && hasEnoughBalance !== null && (
@@ -258,6 +281,8 @@ export default function MachineCard({
             </TouchableOpacity>
           )} */}
         </View>
+          </View>
+        </LinearGradient>
       </TouchableOpacity>
     </MotiView>
   )
@@ -268,14 +293,79 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   card: {
-    borderRadius: responsive(16, 20, 24),
+    borderRadius: responsive(20, 24, 28),
     overflow: 'hidden',
     ...shadows.large,
-    position: 'relative',
-    ...glassmorphism.medium,
     ...(Platform.OS === 'web' && {
       transition: 'all 0.3s ease',
     }),
+  },
+  gradientBackground: {
+    flex: 1,
+    borderRadius: responsive(20, 24, 28),
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: responsive(350, 400, 450),
+  },
+  decorativeElements: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  cylinder: {
+    position: 'absolute',
+    borderRadius: responsive(60, 80, 100),
+    shadowColor: 'rgba(0, 0, 0, 0.15)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  cylinder1: {
+    width: responsive(120, 150, 180),
+    height: responsive(80, 100, 120),
+    top: responsive(30, 40, 50),
+    right: responsive(-40, -50, -60),
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    transform: [{ rotate: '25deg' }],
+  },
+  cylinder2: {
+    width: responsive(100, 120, 140),
+    height: responsive(60, 80, 100),
+    bottom: responsive(40, 50, 60),
+    left: responsive(-30, -40, -50),
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    transform: [{ rotate: '-30deg' }],
+  },
+  contentOverlay: {
+    flex: 1,
+    zIndex: 2,
+    padding: responsive(16, 20, 24),
+  },
+  topIconContainer: {
+    position: 'absolute',
+    top: responsive(16, 20, 24),
+    left: responsive(16, 20, 24),
+    zIndex: 3,
+  },
+  iconCircle: {
+    width: responsive(40, 48, 56),
+    height: responsive(40, 48, 56),
+    borderRadius: responsive(20, 24, 28),
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  iconText: {
+    fontSize: responsive(18, 22, 26),
   },
   cardHovered: {
     transform: [{ scale: 1.02 }],
@@ -294,19 +384,35 @@ const styles = StyleSheet.create({
   // Image Section
   imageSection: {
     position: 'relative',
-    height: responsive(200, 240, 280),
-    backgroundColor: '#1F2937',
+    height: responsive(140, 160, 180),
+    marginTop: responsive(60, 70, 80), // Space for top icon
+    marginHorizontal: responsive(16, 20, 24),
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: responsive(12, 16, 20),
+    overflow: 'hidden',
+    justifyContent: 'flex-start', // Align content to top
+    alignItems: 'center',
   },
   productImage: {
     width: '100%',
-    height: '100%',
+    height: responsive(200, 220, 240), // Taller than container to allow cropping from bottom
     backgroundColor: 'rgba(31, 41, 55, 0.8)',
+    position: 'absolute',
+    top: 0, // Anchor to top of container
+    left: 0,
+    right: 0,
+    ...(Platform.OS === 'web' && {
+      // @ts-ignore - Web-specific CSS properties
+      objectPosition: 'center top',
+      objectFit: 'cover',
+    }),
   },
   statusBadge: {
     position: 'absolute',
     top: spacing.sm,
     left: spacing.sm,
     paddingHorizontal: spacing.sm,
+    zIndex: 2, // Ensure it appears above the image
     paddingVertical: spacing.xs,
     borderRadius: 20,
     ...shadows.small,
@@ -326,6 +432,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 20,
+    zIndex: 2, // Ensure it appears above the image
     ...shadows.small,
   },
   hotSaleText: {
@@ -338,8 +445,10 @@ const styles = StyleSheet.create({
   
   // Product Info Section
   productInfo: {
-    padding: responsive(spacing.md, spacing.lg, spacing.xl),
+    padding: responsive(16, 20, 24),
+    paddingTop: responsive(12, 16, 20),
     gap: spacing.sm,
+    flex: 1,
   },
   category: {
     fontSize: fontSizes.xs,
@@ -371,12 +480,12 @@ const styles = StyleSheet.create({
     marginVertical: spacing.sm,
   },
   featureTag: {
-    backgroundColor: 'rgba(82, 82, 215, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   featureText: {
     fontSize: fontSizes.xs,
@@ -488,43 +597,12 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontFamily: 'NB International Pro',
   },
-  machineAddressSection: {
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: 'rgba(31, 41, 55, 0.3)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.2)',
+  addressContainer: {
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
   },
-  machineAddressLabel: {
-    fontSize: fontSizes.sm,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: 'NB International Pro',
-    marginBottom: spacing.xs,
-  },
-  machineAddressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  machineAddressStatus: {
-    fontSize: fontSizes.sm,
-    color: '#10B981',
-    fontFamily: 'NB International Pro',
-    fontWeight: '500',
-  },
-  machineAddressButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: 'rgba(82, 82, 215, 0.2)',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(82, 82, 215, 0.3)',
-  },
-  machineAddressText: {
+  addressLabel: {
     fontSize: fontSizes.xs,
-    color: '#60A5FA',
     fontFamily: 'NB International Pro',
     fontWeight: '500',
   },

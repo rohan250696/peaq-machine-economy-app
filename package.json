@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "expo export --platform web --output-dir dist",
+    "build:docker": "docker build --build-arg KBW_APP_WALLET_KEY=$KBW_APP_WALLET_KEY -t peaq-app .",
+    "inject-env": "node scripts/inject-env.js"
   },
   "dependencies": {
     "@craftzdog/react-native-buffer": "^6.1.0",
@@ -47,6 +50,7 @@
     "react": "19.0.0",
     "react-dom": "^19.0.0",
     "react-native": "0.79.5",
+    "react-native-dotenv": "^3.4.11",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-passkeys": "^0.3.3",
     "react-native-quick-crypto": "^0.7.6",
